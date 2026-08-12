@@ -28,7 +28,8 @@ export function JourneyRouteSelector() {
           <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">Journey</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink md:text-4xl">Choose your connection.</h1>
           <p className="mt-3 max-w-xl text-base leading-7 text-muted">
-            Compare regional-transport routes, then select the one you want to use today.
+            Compare regional-transport routes. EnRoute balances your arrival around 30 minutes before class, then you
+            can select the connection you want to use.
           </p>
         </div>
         <Link
@@ -95,7 +96,9 @@ function RouteOption({
           )}
           <span className="font-bold text-ink">{isSelected ? 'Selected route' : 'Choose this route'}</span>
           {isRecommended && (
-            <span className="rounded-full bg-teal-100 px-2.5 py-1 text-xs font-bold text-brand-deep">Recommended</span>
+            <span className="rounded-full bg-teal-100 px-2.5 py-1 text-xs font-bold text-brand-deep">
+              Balanced recommendation
+            </span>
           )}
         </div>
         <span className="text-sm font-bold text-brand-deep">{formatDuration(journey.durationMinutes)}</span>

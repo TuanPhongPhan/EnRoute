@@ -3,6 +3,8 @@ import type { TransportJourney } from '@/lib/transport-provider';
 export type CommuteRisk = 'safe' | 'tight' | 'late';
 export type ConnectionRisk = 'safe' | 'at_risk' | 'missed';
 
+export const balancedArrivalBufferMinutes = 30;
+
 export type CommuteRecommendation = {
   journey: TransportJourney;
   leaveHomeAt: string;
@@ -19,12 +21,16 @@ export function rankFeasibleJourneys(
 ) {
   // A route must reach HNU before the user-configured buffer begins; showing a faster-but-late option is misleading.
   const targetArrival = Date.parse(classStartsAt) - arrivalBufferMinutes * 60_000;
+  // Aim for a practical cushion instead of always choosing the shortest trip, which can require leaving unnecessarily early.
+  const balancedBuffer = Math.max(arrivalBufferMinutes, balancedArrivalBufferMinutes);
   return journeys
     .filter((journey) => Date.parse(journey.arrival) <= targetArrival)
     .sort(
       (left, right) =>
-        left.durationMinutes - right.durationMinutes ||
+        Math.abs(arrivalBuffer(classStartsAt, left.arrival) - balancedBuffer) -
+          Math.abs(arrivalBuffer(classStartsAt, right.arrival) - balancedBuffer) ||
         left.transfers - right.transfers ||
+        left.durationMinutes - right.durationMinutes ||
         Date.parse(right.arrival) - Date.parse(left.arrival),
     );
 }
@@ -34,7 +40,7 @@ export function createCommuteRecommendation(
   classStartsAt: string,
   arrivalBufferMinutes: number,
 ): CommuteRecommendation {
-  const bufferMinutes = Math.round((Date.parse(classStartsAt) - Date.parse(journey.arrival)) / 60_000);
+  const bufferMinutes = arrivalBuffer(classStartsAt, journey.arrival);
   return {
     journey,
     leaveHomeAt: journey.departure,
@@ -59,4 +65,8 @@ export function connectionRisk(journey: TransportJourney, minimumMinutes = 5): C
 
 export function departureCountdown(leaveHomeAt: string, now = new Date()) {
   return Math.round((Date.parse(leaveHomeAt) - now.getTime()) / 60_000);
+}
+
+function arrivalBuffer(classStartsAt: string, arrivalAt: string) {
+  return Math.round((Date.parse(classStartsAt) - Date.parse(arrivalAt)) / 60_000);
 }
