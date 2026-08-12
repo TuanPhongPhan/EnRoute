@@ -7,6 +7,7 @@ create table public.notification_preferences (
   updated_at timestamptz not null default now()
 );
 
+-- Fingerprints make a retry-safe delivery ledger: the same commute state can notify a user only once.
 create table public.notification_deliveries (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,

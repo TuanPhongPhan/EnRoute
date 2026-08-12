@@ -13,6 +13,7 @@ export type CommuteRecommendation = {
 };
 
 export function rankFeasibleJourneys(journeys: TransportJourney[], classStartsAt: string, arrivalBufferMinutes: number) {
+  // A route must reach HNU before the user-configured buffer begins; showing a faster-but-late option is misleading.
   const targetArrival = Date.parse(classStartsAt) - arrivalBufferMinutes * 60_000;
   return journeys
     .filter((journey) => Date.parse(journey.arrival) <= targetArrival)
@@ -32,6 +33,7 @@ export function createCommuteRecommendation(journey: TransportJourney, classStar
 }
 
 export function connectionRisk(journey: TransportJourney, minimumMinutes = 5): ConnectionRisk {
+  // Use actual times so realtime delays affect transfer risk; five minutes is the app's conservative default.
   for (let index = 0; index < journey.legs.length - 1; index += 1) {
     const margin = Math.round((Date.parse(journey.legs[index + 1].actualDeparture) - Date.parse(journey.legs[index].actualArrival)) / 60_000);
     if (margin < 0) return 'missed';

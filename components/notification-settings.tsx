@@ -27,6 +27,7 @@ export function NotificationSettings() {
   }, []);
 
   async function change(key: keyof Preferences, enabled: boolean) {
+    // Permission is requested only after an explicit opt-in, which prevents an intrusive prompt on first visit.
     if (enabled && Notification.permission === 'default') {
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') { setStatus(permission === 'denied' ? 'denied' : 'ready'); return; }
@@ -46,6 +47,7 @@ export function NotificationSettings() {
 }
 
 async function registerSubscription() {
+  // A VAPID public key identifies this app to the browser push service; its matching private key stays in Supabase.
   const registration = await navigator.serviceWorker.ready;
   const existing = await registration.pushManager.getSubscription();
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;

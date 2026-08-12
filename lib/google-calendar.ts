@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import type { Credentials } from 'google-auth-library';
 import { google } from 'googleapis';
 
+// Keep OAuth access minimal: EnRoute only reads calendars and events, never creates or changes them.
 const scopes = [
   'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
   'https://www.googleapis.com/auth/calendar.events.readonly',
@@ -51,6 +52,7 @@ export async function getUniversityEvents(encryptedTokens: string, calendarId: s
 }
 
 function isUniversityLocation(location: string | null | undefined) {
+  // Calendar selection narrows the source; location matching prevents unrelated events from creating commutes.
   return /hochschule\s*neu-ulm|\bhnu\b|wileystra(?:ß|ss)e/i.test(location ?? '');
 }
 
@@ -61,6 +63,7 @@ async function calendarClient(encryptedTokens: string) {
 }
 
 function encryptionKey() {
+  // AES-256-GCM requires exactly 32 bytes. The hex env value stays server-side and is never returned to the client.
   const value = process.env.GOOGLE_TOKEN_ENCRYPTION_KEY;
   if (!value || !/^[a-f0-9]{64}$/i.test(value)) return null;
   return Buffer.from(value, 'hex');
@@ -72,6 +75,7 @@ function encryptCredentials(credentials: StoredGoogleCredentials) {
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
   const encrypted = Buffer.concat([cipher.update(JSON.stringify(credentials), 'utf8'), cipher.final()]);
+  // Version the payload to allow future key/format migrations without guessing how old tokens were encrypted.
   return `v1.${iv.toString('base64url')}.${cipher.getAuthTag().toString('base64url')}.${encrypted.toString('base64url')}`;
 }
 

@@ -9,6 +9,7 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   const body = await request.json() as SubscriptionPayload;
   if (typeof body.endpoint !== 'string' || typeof body.keys?.p256dh !== 'string' || typeof body.keys.auth !== 'string') return NextResponse.json({ error: 'invalid_subscription' }, { status: 400 });
+  // Store only browser-issued subscription material. RLS binds every record to the authenticated user.
   const { error } = await supabase.from('push_subscriptions').upsert({ user_id: user.id, endpoint: body.endpoint, p256dh: body.keys.p256dh, auth: body.keys.auth }, { onConflict: 'user_id,endpoint' });
   if (error) return NextResponse.json({ error: 'save_failed' }, { status: 500 });
   return NextResponse.json({ ok: true });

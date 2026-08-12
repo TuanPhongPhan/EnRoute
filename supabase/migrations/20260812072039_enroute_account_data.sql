@@ -9,6 +9,7 @@ create table public.user_settings (
   updated_at timestamptz not null default now()
 );
 
+-- Tokens are encrypted by the server before storage; the client must never read OAuth credentials directly.
 create table public.calendar_integrations (
   user_id uuid primary key references auth.users(id) on delete cascade,
   encrypted_tokens text not null,
@@ -41,6 +42,7 @@ create table public.monitored_commutes (
 
 create index monitored_commutes_active_idx on public.monitored_commutes (user_id, departure_at) where status = 'active';
 
+-- These tables are exposed through Supabase's Data API, so RLS is mandatory in addition to application checks.
 alter table public.user_settings enable row level security;
 alter table public.calendar_integrations enable row level security;
 alter table public.push_subscriptions enable row level security;

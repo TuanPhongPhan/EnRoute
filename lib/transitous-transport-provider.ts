@@ -2,7 +2,9 @@ import type { JourneySearchInput, TransportJourney, TransportJourneyLeg, Transpo
 import { TransportProviderError } from '@/lib/transport-provider';
 
 const baseUrl = 'https://api.transitous.org';
+// Keep a short cache to avoid duplicate provider calls during UI refreshes without treating journey data as live.
 const cacheTtlMs = 60_000;
+// V1 intentionally limits plans to regional modes so recommendations remain Deutschlandticket-compatible.
 const regionalTransitModes = ['SUBWAY', 'BUS', 'TRAM', 'SUBURBAN', 'REGIONAL_RAIL'] as const;
 
 type TransitousMatch = { id?: string; type?: string; lat?: number; lon?: number };
@@ -53,6 +55,7 @@ export class TransitousTransportProvider implements TransportProvider {
     const cached = this.fromCache(this.stopCache, key);
     if (cached) return cached;
     const payload = await this.fetchJson<TransitousMatch[]>(buildGeocodeUrl(query), 'geocode');
+    // Transitous plans are most reliable with coordinates; use an opaque stop ID only if geocoding has no coordinates.
     const address = payload.find((match) => typeof match.lat === 'number' && typeof match.lon === 'number');
     const placeReference = address ? `${address.lat},${address.lon}` : payload.find((match) => typeof match.id === 'string' && match.id.length > 0)?.id;
     if (!placeReference) throw new TransportProviderError('location_not_found', 'One of the saved addresses could not be found.');
@@ -101,6 +104,7 @@ export function buildPlanUrl(fromPlace: string, toPlace: string, time: Date, arr
   url.searchParams.set('fromPlace', fromPlace);
   url.searchParams.set('toPlace', toPlace);
   url.searchParams.set('time', time.toISOString());
+  // Commute recommendations work backwards from lecture time, so arrival-based planning is the normal path.
   if (arriveBy) url.searchParams.set('arriveBy', 'true');
   url.searchParams.set('transitModes', regionalTransitModes.join(','));
   url.searchParams.set('numItineraries', '3');
@@ -109,6 +113,7 @@ export function buildPlanUrl(fromPlace: string, toPlace: string, time: Date, arr
 }
 
 export function normalizeTransitousItinerary(itinerary: TransitousItinerary, index: number): TransportJourney | null {
+  // Keep provider-specific names here; UI and commute logic consume only the normalized domain model.
   const legs = (itinerary.legs ?? []).map(normalizeLeg).filter((leg): leg is TransportJourneyLeg => leg !== null);
   const departure = itinerary.startTime ?? legs[0]?.actualDeparture;
   const arrival = itinerary.endTime ?? legs.at(-1)?.actualArrival;
@@ -141,6 +146,7 @@ function normalizeLeg(leg: TransitousLeg): TransportJourneyLeg | null {
     actualDeparture,
     scheduledArrival,
     actualArrival,
+    // A late departure or arrival makes the whole leg delayed; early values are not surfaced as a negative delay.
     delayMinutes: Math.max(0, Math.round(Math.max(Date.parse(actualDeparture) - Date.parse(scheduledDeparture), Date.parse(actualArrival) - Date.parse(scheduledArrival)) / 60_000)),
     hasRealtime: Boolean(leg.scheduledStartTime || leg.scheduledEndTime),
   };

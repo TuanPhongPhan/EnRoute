@@ -1,5 +1,6 @@
 import type { TransportJourney, TransportJourneyLeg } from '@/lib/transport-provider';
 
+// Bump this key whenever the persisted Journey shape changes; stale journeys must never be presented as live.
 const storageKey = 'enroute:current-journey:v3';
 
 export type CurrentJourney = { journeys: TransportJourney[]; selectedJourneyId: string };
@@ -9,6 +10,7 @@ export function readCurrentJourney(storage = browserStorage()): CurrentJourney |
   try {
     const parsed: unknown = JSON.parse(storage.getItem(storageKey) ?? 'null');
     if (!isCurrentJourney(parsed)) return null;
+    // The cached route is an offline fallback only until its selected arrival time has passed.
     if (Date.parse(selectedJourney(parsed)?.arrival ?? '') <= Date.now()) { storage.removeItem(storageKey); return null; }
     return parsed;
   } catch {
