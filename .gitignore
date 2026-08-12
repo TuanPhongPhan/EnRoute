@@ -1,0 +1,25 @@
+/tmp
+/out-tsc
+
+/node_modules
+.next/
+/out/
+/.pwa-cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+/.pnp
+.pnp.js
+*.tsbuildinfo
+.env*.local
+
+# Local editor, agent, and generated design documentation
+.DS_Store
+.idea/
+.codex/
+docs/
+design-system/
+AGENTS.md
+supabase/.temp/
+
+.vscode/*

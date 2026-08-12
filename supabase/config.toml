@@ -1,0 +1,2 @@
+[functions.commute-monitor]
+verify_jwt = false
