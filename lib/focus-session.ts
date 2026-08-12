@@ -12,6 +12,7 @@ export type FocusSession = {
   pausedMs: number;
   completed: boolean;
   destination: string;
+  clientSessionId: string;
 };
 const key = 'enroute:focus-session:v1';
 
@@ -47,7 +48,11 @@ export function saveFocus(session: FocusSession) {
 export function readFocus(): FocusSession | null {
   try {
     const value = JSON.parse(localStorage.getItem(key) ?? 'null');
-    return value?.blocks && typeof value.activeIndex === 'number' ? value : null;
+    if (!value?.blocks || typeof value.activeIndex !== 'number') return null;
+    return {
+      ...value,
+      clientSessionId: typeof value.clientSessionId === 'string' ? value.clientSessionId : crypto.randomUUID(),
+    };
   } catch {
     return null;
   }
