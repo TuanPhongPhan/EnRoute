@@ -2,7 +2,27 @@ import { describe, expect, it } from 'vitest';
 import { readCurrentJourney, saveCurrentJourneys, selectCurrentJourney, selectedJourney } from '@/lib/current-journey';
 import type { TransportJourney } from '@/lib/transport-provider';
 
-const firstJourney: TransportJourney = { id: 'first', departure: '2030-08-10T06:00:00Z', arrival: '2030-08-10T08:00:00Z', durationMinutes: 120, transfers: 1, hasDelays: false, legs: [{ mode: 'subway', label: 'U2', origin: 'A', destination: 'B', scheduledDeparture: '2030-08-10T06:00:00Z', actualDeparture: '2030-08-10T06:00:00Z', scheduledArrival: '2030-08-10T06:20:00Z', actualArrival: '2030-08-10T06:20:00Z', delayMinutes: 0 }] };
+const firstJourney: TransportJourney = {
+  id: 'first',
+  departure: '2030-08-10T06:00:00Z',
+  arrival: '2030-08-10T08:00:00Z',
+  durationMinutes: 120,
+  transfers: 1,
+  hasDelays: false,
+  legs: [
+    {
+      mode: 'subway',
+      label: 'U2',
+      origin: 'A',
+      destination: 'B',
+      scheduledDeparture: '2030-08-10T06:00:00Z',
+      actualDeparture: '2030-08-10T06:00:00Z',
+      scheduledArrival: '2030-08-10T06:20:00Z',
+      actualArrival: '2030-08-10T06:20:00Z',
+      delayMinutes: 0,
+    },
+  ],
+};
 const secondJourney: TransportJourney = { ...firstJourney, id: 'second', arrival: '2030-08-10T08:10:00Z' };
 
 describe('current journey session', () => {
@@ -36,10 +56,22 @@ describe('current journey session', () => {
 
 class MemoryStorage implements Storage {
   private values = new Map<string, string>();
-  get length() { return this.values.size; }
-  clear() { this.values.clear(); }
-  getItem(key: string) { return this.values.get(key) ?? null; }
-  key(index: number) { return [...this.values.keys()][index] ?? null; }
-  removeItem(key: string) { this.values.delete(key); }
-  setItem(key: string, value: string) { this.values.set(key, value); }
+  get length() {
+    return this.values.size;
+  }
+  clear() {
+    this.values.clear();
+  }
+  getItem(key: string) {
+    return this.values.get(key) ?? null;
+  }
+  key(index: number) {
+    return [...this.values.keys()][index] ?? null;
+  }
+  removeItem(key: string) {
+    this.values.delete(key);
+  }
+  setItem(key: string, value: string) {
+    this.values.set(key, value);
+  }
 }

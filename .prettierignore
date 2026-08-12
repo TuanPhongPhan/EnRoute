@@ -1,0 +1,9 @@
+node_modules/
+.next/
+.idea/
+.codex/
+docs/
+design-system/
+supabase/.temp/
+*.tsbuildinfo
+.env*.local

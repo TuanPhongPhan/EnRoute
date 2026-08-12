@@ -38,8 +38,10 @@ export function saveCommutePreferences(preferences: CommutePreferences) {
 function isCommutePreferences(value: unknown): value is CommutePreferences {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Record<string, unknown>;
-  return typeof candidate.homeAddress === 'string'
-    && typeof candidate.universityAddress === 'string'
-    && arrivalBufferOptions.some((option) => option === candidate.arrivalBufferMinutes)
-    && (candidate.calendarId === undefined || typeof candidate.calendarId === 'string');
+  return (
+    typeof candidate.homeAddress === 'string' &&
+    typeof candidate.universityAddress === 'string' &&
+    arrivalBufferOptions.some((option) => option === candidate.arrivalBufferMinutes) &&
+    (candidate.calendarId === undefined || typeof candidate.calendarId === 'string')
+  );
 }

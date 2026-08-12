@@ -38,7 +38,10 @@ export interface TransportProvider {
 }
 
 export class TransportProviderError extends Error {
-  constructor(public readonly code: 'location_not_found' | 'no_route' | 'rate_limited' | 'unavailable', message: string) {
+  constructor(
+    public readonly code: 'location_not_found' | 'no_route' | 'rate_limited' | 'unavailable',
+    message: string,
+  ) {
     super(message);
     this.name = 'TransportProviderError';
   }

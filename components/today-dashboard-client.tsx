@@ -27,48 +27,115 @@ export function TodayDashboardClient() {
     setTransportState('loading');
     try {
       const targetArrival = new Date(Date.parse(nextEvent.startsAt) - preferences.arrivalBufferMinutes * 60_000);
-      const params = new URLSearchParams({ from: preferences.homeAddress, to: preferences.universityAddress, time: targetArrival.toISOString(), arriveBy: 'true' });
+      const params = new URLSearchParams({
+        from: preferences.homeAddress,
+        to: preferences.universityAddress,
+        time: targetArrival.toISOString(),
+        arriveBy: 'true',
+      });
       const response = await fetch(`/api/transport/journeys?${params.toString()}`);
       if (!response.ok) {
-        setTransportState(toTransportState((await response.json() as { error?: string }).error));
+        setTransportState(toTransportState(((await response.json()) as { error?: string }).error));
         return;
       }
-      const payload = await response.json() as JourneyResponse;
+      const payload = (await response.json()) as JourneyResponse;
       const ranked = rankFeasibleJourneys(payload.journeys, nextEvent.startsAt, preferences.arrivalBufferMinutes);
-      if (!ranked.length) { setTransportState('no_route'); return; }
+      if (!ranked.length) {
+        setTransportState('no_route');
+        return;
+      }
       const current = saveCurrentJourneys(ranked, undefined, readCurrentJourney()?.selectedJourneyId);
       const journey = selectedJourney(current);
-      if (!journey) { setTransportState('unavailable'); return; }
-      setCommute(createTodayCommute(nextEvent, createCommuteRecommendation(journey, nextEvent.startsAt, preferences.arrivalBufferMinutes), new Date(payload.fetchedAt)));
-      void fetch('/api/commutes/monitor', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ calendarEventId: nextEvent.id, departureAt: journey.departure, arrivalAt: journey.arrival, eventStartsAt: nextEvent.startsAt }) });
+      if (!journey) {
+        setTransportState('unavailable');
+        return;
+      }
+      setCommute(
+        createTodayCommute(
+          nextEvent,
+          createCommuteRecommendation(journey, nextEvent.startsAt, preferences.arrivalBufferMinutes),
+          new Date(payload.fetchedAt),
+        ),
+      );
+      void fetch('/api/commutes/monitor', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          calendarEventId: nextEvent.id,
+          departureAt: journey.departure,
+          arrivalAt: journey.arrival,
+          eventStartsAt: nextEvent.startsAt,
+        }),
+      });
       setTransportState('route_ready');
-    } catch { setTransportState('unavailable'); }
+    } catch {
+      setTransportState('unavailable');
+    }
   }, []);
 
   useEffect(() => {
     const cached = readEventSnapshot();
-    if (cached) { const journey = selectedJourney(readCurrentJourney()); if (journey) setCommute(createTodayCommute(cached.event, createCommuteRecommendation(journey, cached.event.startsAt, readCommutePreferences().arrivalBufferMinutes), new Date(cached.fetchedAt))); setEvent(cached.event); setCalendarState('connected'); void refreshJourney(cached.event); }
-    const preferences = readCommutePreferences();
-    void fetch(`/api/google/calendar/next-event?calendarId=${encodeURIComponent(preferences.calendarId)}`).then(async (response) => {
-      if (!response.ok) { setCalendarState(response.status === 401 ? 'disconnected' : 'unavailable'); return; }
-      const payload = await response.json() as CalendarResponse;
-      if (!payload.event) { setCalendarState('no-event'); return; }
-      saveEventSnapshot(payload.event);
-      setEvent(payload.event);
+    if (cached) {
+      const journey = selectedJourney(readCurrentJourney());
+      if (journey)
+        setCommute(
+          createTodayCommute(
+            cached.event,
+            createCommuteRecommendation(journey, cached.event.startsAt, readCommutePreferences().arrivalBufferMinutes),
+            new Date(cached.fetchedAt),
+          ),
+        );
+      setEvent(cached.event);
       setCalendarState('connected');
-      void refreshJourney(payload.event);
-    }).catch(() => setCalendarState('unavailable'));
+      void refreshJourney(cached.event);
+    }
+    const preferences = readCommutePreferences();
+    void fetch(`/api/google/calendar/next-event?calendarId=${encodeURIComponent(preferences.calendarId)}`)
+      .then(async (response) => {
+        if (!response.ok) {
+          setCalendarState(response.status === 401 ? 'disconnected' : 'unavailable');
+          return;
+        }
+        const payload = (await response.json()) as CalendarResponse;
+        if (!payload.event) {
+          setCalendarState('no-event');
+          return;
+        }
+        saveEventSnapshot(payload.event);
+        setEvent(payload.event);
+        setCalendarState('connected');
+        void refreshJourney(payload.event);
+      })
+      .catch(() => setCalendarState('unavailable'));
   }, [refreshJourney]);
 
   useEffect(() => {
     if (!event) return;
-    const refreshWhenVisible = () => { if (document.visibilityState === 'visible') void refreshJourney(event); };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshJourney(event);
+    };
     const timer = window.setInterval(refreshWhenVisible, 120_000);
     document.addEventListener('visibilitychange', refreshWhenVisible);
-    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', refreshWhenVisible); };
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
   }, [event, refreshJourney]);
 
-  return <TodayDashboard calendarState={calendarState} commute={commute} onRefreshJourney={event ? () => { void refreshJourney(event); } : undefined} transportState={transportState} />;
+  return (
+    <TodayDashboard
+      calendarState={calendarState}
+      commute={commute}
+      onRefreshJourney={
+        event
+          ? () => {
+              void refreshJourney(event);
+            }
+          : undefined
+      }
+      transportState={transportState}
+    />
+  );
 }
 
 function toTransportState(error: string | undefined): TransportState {

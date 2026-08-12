@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "format": "prettier --write app components lib proxy.ts next.config.ts eslint.config.mjs postcss.config.mjs vitest.config.mts package.json tsconfig.json",
+    "format:check": "prettier --check app components lib proxy.ts next.config.ts eslint.config.mjs postcss.config.mjs vitest.config.mts package.json tsconfig.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -27,6 +29,7 @@
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.0",
     "postcss": "^8.5.26",
+    "prettier": "3.6.2",
     "supabase": "^2.113.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.5.3",

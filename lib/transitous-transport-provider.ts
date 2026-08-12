@@ -1,4 +1,10 @@
-import type { JourneySearchInput, TransportJourney, TransportJourneyLeg, TransportMode, TransportProvider } from '@/lib/transport-provider';
+import type {
+  JourneySearchInput,
+  TransportJourney,
+  TransportJourneyLeg,
+  TransportMode,
+  TransportProvider,
+} from '@/lib/transport-provider';
 import { TransportProviderError } from '@/lib/transport-provider';
 
 const baseUrl = 'https://api.transitous.org';
@@ -20,7 +26,14 @@ type TransitousLeg = {
   displayName?: string;
   routeShortName?: string;
 };
-type TransitousItinerary = { id?: string; startTime?: string; endTime?: string; duration?: number; transfers?: number; legs?: TransitousLeg[] };
+type TransitousItinerary = {
+  id?: string;
+  startTime?: string;
+  endTime?: string;
+  duration?: number;
+  transfers?: number;
+  legs?: TransitousLeg[];
+};
 type TransitousPlan = { itineraries?: TransitousItinerary[] };
 type CacheEntry<T> = { expiresAt: number; value: T };
 type Fetcher = (input: URL, init: RequestInit) => Promise<Response>;
@@ -29,7 +42,10 @@ export class TransitousTransportProvider implements TransportProvider {
   private readonly stopCache = new Map<string, CacheEntry<string>>();
   private readonly journeyCache = new Map<string, CacheEntry<TransportJourney[]>>();
 
-  constructor(private readonly fetcher: Fetcher = fetch, private readonly now = () => Date.now()) {}
+  constructor(
+    private readonly fetcher: Fetcher = fetch,
+    private readonly now = () => Date.now(),
+  ) {}
 
   async searchJourneys(input: JourneySearchInput): Promise<TransportJourney[]> {
     const key = journeyCacheKey(input);
@@ -40,7 +56,9 @@ export class TransitousTransportProvider implements TransportProvider {
       const [fromPlace, toPlace] = await Promise.all([this.resolveStop(input.from), this.resolveStop(input.to)]);
       const url = buildPlanUrl(fromPlace, toPlace, input.time, input.arriveBy);
       const payload = await this.fetchJson<TransitousPlan>(url, 'plan');
-      const journeys = (payload.itineraries ?? []).map(normalizeTransitousItinerary).filter((journey): journey is TransportJourney => journey !== null);
+      const journeys = (payload.itineraries ?? [])
+        .map(normalizeTransitousItinerary)
+        .filter((journey): journey is TransportJourney => journey !== null);
       if (!journeys.length) throw new TransportProviderError('no_route', 'No regional-transport journey was returned.');
       this.toCache(this.journeyCache, key, journeys);
       return journeys;
@@ -57,8 +75,11 @@ export class TransitousTransportProvider implements TransportProvider {
     const payload = await this.fetchJson<TransitousMatch[]>(buildGeocodeUrl(query), 'geocode');
     // Transitous plans are most reliable with coordinates; use an opaque stop ID only if geocoding has no coordinates.
     const address = payload.find((match) => typeof match.lat === 'number' && typeof match.lon === 'number');
-    const placeReference = address ? `${address.lat},${address.lon}` : payload.find((match) => typeof match.id === 'string' && match.id.length > 0)?.id;
-    if (!placeReference) throw new TransportProviderError('location_not_found', 'One of the saved addresses could not be found.');
+    const placeReference = address
+      ? `${address.lat},${address.lon}`
+      : payload.find((match) => typeof match.id === 'string' && match.id.length > 0)?.id;
+    if (!placeReference)
+      throw new TransportProviderError('location_not_found', 'One of the saved addresses could not be found.');
     this.toCache(this.stopCache, key, placeReference);
     return placeReference;
   }
@@ -74,18 +95,27 @@ export class TransitousTransportProvider implements TransportProvider {
 
   private async fetchJson<T>(url: URL, kind: 'geocode' | 'plan'): Promise<T> {
     const userAgent = process.env.TRANSITOUS_USER_AGENT?.trim();
-    if (!userAgent) throw new TransportProviderError('unavailable', 'Transitous is not configured. Add TRANSITOUS_USER_AGENT to .env.local.');
+    if (!userAgent)
+      throw new TransportProviderError(
+        'unavailable',
+        'Transitous is not configured. Add TRANSITOUS_USER_AGENT to .env.local.',
+      );
     let response: Response;
     try {
-      response = await this.fetcher(url, { cache: 'no-store', headers: { Accept: 'application/json', 'User-Agent': userAgent } });
+      response = await this.fetcher(url, {
+        cache: 'no-store',
+        headers: { Accept: 'application/json', 'User-Agent': userAgent },
+      });
     } catch {
       throw new TransportProviderError('unavailable', 'Regional transport provider could not be reached.');
     }
     if (kind === 'geocode' && (response.status === 400 || response.status === 404 || response.status === 422)) {
       throw new TransportProviderError('location_not_found', 'One of the saved addresses could not be found.');
     }
-    if (kind === 'plan' && response.status === 422) throw new TransportProviderError('no_route', 'No regional-transport route was found.');
-    if (response.status === 429) throw new TransportProviderError('rate_limited', 'Regional transport requests are temporarily rate-limited.');
+    if (kind === 'plan' && response.status === 422)
+      throw new TransportProviderError('no_route', 'No regional-transport route was found.');
+    if (response.status === 429)
+      throw new TransportProviderError('rate_limited', 'Regional transport requests are temporarily rate-limited.');
     if (!response.ok) throw new TransportProviderError('unavailable', 'Regional transport provider is unavailable.');
     return response.json() as Promise<T>;
   }
@@ -122,7 +152,9 @@ export function normalizeTransitousItinerary(itinerary: TransitousItinerary, ind
     id: itinerary.id ?? `transitous-route-${index}`,
     departure,
     arrival,
-    durationMinutes: itinerary.duration ? Math.round(itinerary.duration / 60) : Math.max(0, Math.round((Date.parse(arrival) - Date.parse(departure)) / 60_000)),
+    durationMinutes: itinerary.duration
+      ? Math.round(itinerary.duration / 60)
+      : Math.max(0, Math.round((Date.parse(arrival) - Date.parse(departure)) / 60_000)),
     transfers: itinerary.transfers ?? Math.max(0, legs.filter((leg) => leg.mode !== 'walk').length - 1),
     hasDelays: legs.some((leg) => leg.delayMinutes > 0),
     hasRealtime: legs.some((leg) => leg.hasRealtime),
@@ -147,7 +179,15 @@ function normalizeLeg(leg: TransitousLeg): TransportJourneyLeg | null {
     scheduledArrival,
     actualArrival,
     // A late departure or arrival makes the whole leg delayed; early values are not surfaced as a negative delay.
-    delayMinutes: Math.max(0, Math.round(Math.max(Date.parse(actualDeparture) - Date.parse(scheduledDeparture), Date.parse(actualArrival) - Date.parse(scheduledArrival)) / 60_000)),
+    delayMinutes: Math.max(
+      0,
+      Math.round(
+        Math.max(
+          Date.parse(actualDeparture) - Date.parse(scheduledDeparture),
+          Date.parse(actualArrival) - Date.parse(scheduledArrival),
+        ) / 60_000,
+      ),
+    ),
     hasRealtime: Boolean(leg.scheduledStartTime || leg.scheduledEndTime),
   };
 }

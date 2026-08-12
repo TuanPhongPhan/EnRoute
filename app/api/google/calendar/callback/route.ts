@@ -15,13 +15,29 @@ export async function GET(request: Request) {
   const redirect = (status: string) => NextResponse.redirect(new URL(`/settings?calendar=${status}`, request.url));
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   const [stateUserId, expectedStateValue] = expectedState?.split('.', 2) ?? [];
-  if (error || !code || !state || !user || stateUserId !== user.id || state !== expectedStateValue || !hasGoogleCalendarConfiguration()) return redirect('connection-failed');
+  if (
+    error ||
+    !code ||
+    !state ||
+    !user ||
+    stateUserId !== user.id ||
+    state !== expectedStateValue ||
+    !hasGoogleCalendarConfiguration()
+  )
+    return redirect('connection-failed');
 
   try {
     const encryptedTokens = await exchangeAuthorizationCode(code);
-    const { error: saveError } = await supabase.from('calendar_integrations').upsert({ user_id: user.id, encrypted_tokens: encryptedTokens, status: 'connected', updated_at: new Date().toISOString() });
+    const { error: saveError } = await supabase.from('calendar_integrations').upsert({
+      user_id: user.id,
+      encrypted_tokens: encryptedTokens,
+      status: 'connected',
+      updated_at: new Date().toISOString(),
+    });
     if (saveError) return redirect('connection-failed');
     const response = redirect('connected');
     response.cookies.delete(stateCookie);
