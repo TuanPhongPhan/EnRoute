@@ -15,9 +15,13 @@ export type CommuteLegView = {
 export type TodayCommute = {
   currentTime: string;
   day: string;
+  greeting: string;
   nextClass: { name: string; startsAt: string; endsAt: string; location: string };
   leaveHomeAt: string;
-  departureCountdown: string;
+  departureCountdown: {
+    label: string;
+    isDue: boolean;
+  };
   arrivalAt: string;
   bufferMinutes: number;
   status: 'On time' | 'Tight connection' | 'Connection at risk' | 'Late for class' | 'Minor delay';
@@ -36,6 +40,7 @@ export function createTodayCommute(
   return {
     currentTime: formatTime(now.toISOString()),
     day: new Intl.DateTimeFormat('en-GB', { weekday: 'long', timeZone: 'Europe/Berlin' }).format(now),
+    greeting: greetingFor(now),
     nextClass: {
       name: event.title,
       startsAt: formatTime(event.startsAt),
@@ -43,7 +48,7 @@ export function createTodayCommute(
       location: event.location,
     },
     leaveHomeAt: formatTime(recommendation.leaveHomeAt),
-    departureCountdown: countdown > 0 ? `${countdown} min` : 'Now',
+    departureCountdown: formatDepartureCountdown(countdown),
     arrivalAt: formatTime(recommendation.expectedArrivalAt),
     bufferMinutes: recommendation.bufferMinutes,
     status:
@@ -72,6 +77,39 @@ export function createTodayCommute(
   };
 }
 
+export function greetingFor(now: Date): string {
+  const hour = Number(
+    new Intl.DateTimeFormat('en-GB', {
+      hour: '2-digit',
+      hourCycle: 'h23',
+      timeZone: 'Europe/Berlin',
+    })
+      .formatToParts(now)
+      .find((part) => part.type === 'hour')?.value,
+  );
+
+  if (hour >= 5 && hour < 12) {
+    return 'Good morning.';
+  }
+
+  if (hour >= 12 && hour < 18) {
+    return 'Good afternoon.';
+  }
+
+  return 'Good evening.';
+}
+
+export function formatDepartureCountdown(minutes: number): {
+  label: string;
+  isDue: boolean;
+} {
+  if (minutes <= 0) {
+    return { label: 'Leave now', isDue: true };
+  }
+
+  return { label: formatDuration(minutes), isDue: false };
+}
+
 function formatTime(value: string) {
   return new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' }).format(
     new Date(value),
@@ -79,5 +117,20 @@ function formatTime(value: string) {
 }
 function minutesLabel(start: string, end: string) {
   const minutes = Math.max(0, Math.round((Date.parse(end) - Date.parse(start)) / 60_000));
-  return minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
+  return formatDuration(minutes);
+}
+
+function formatDuration(minutes: number): string {
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+
+  if (hours === 0) {
+    return `${minutes} min`;
+  }
+
+  if (remainingMinutes === 0) {
+    return `${hours} h`;
+  }
+
+  return `${hours} h ${remainingMinutes} min`;
 }

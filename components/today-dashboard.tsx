@@ -45,7 +45,7 @@ export function TodayDashboard({
             {commute.day} · {commute.currentTime}
           </p>
           <h1 id="today-heading" className="mt-2 text-3xl font-bold tracking-tight text-ink md:text-4xl">
-            Good morning.
+            {commute.greeting}
           </h1>
         </div>
         <div
@@ -68,7 +68,8 @@ export function TodayDashboard({
           </div>
           <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-white/20 pt-5">
             <p className="text-sm text-teal-50">
-              <span className="font-bold text-white">{commute.departureCountdown}</span> until you need to leave
+              <span className="font-bold text-white">{commute.departureCountdown.label}</span>
+              {!commute.departureCountdown.isDue && ' until you need to leave'}
             </p>
             <a
               className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-teal-50"
