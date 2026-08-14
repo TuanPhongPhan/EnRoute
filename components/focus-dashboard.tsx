@@ -149,11 +149,11 @@ export function FocusDashboard() {
         <p className="text-sm font-bold uppercase tracking-[.16em] text-brand">Focus</p>
         <h1 className="mt-2 text-3xl font-bold text-ink">Make train time count.</h1>
         {!leg ? (
-          <p className="rounded-2xl bg-teal-50 p-5 text-muted">
+          <p className="rounded-2xl border border-primary-100 bg-primary-50 p-5 text-text-secondary">
             Choose a journey with a train leg on the Journey screen to build a focus plan.
           </p>
         ) : (
-          <section className="rounded-3xl border border-teal-950/10 bg-surface p-6 shadow-sm">
+          <section className="rounded-3xl border border-border bg-surface p-6 shadow-sm">
             <p className="text-muted">
               You have {Math.round((Date.parse(leg.actualArrival) - Date.parse(leg.actualDeparture)) / 60_000)} min
               before {leg.destination}.
@@ -228,12 +228,12 @@ export function FocusDashboard() {
           <p className="text-sm text-muted">Reward saved on this device and ready to claim when you are online.</p>
         )}
         {rewardState === 'error' && (
-          <p className="text-sm text-orange-800">
+          <p className="text-sm text-warning">
             We could not save your reward yet. Try again when your connection is ready.
           </p>
         )}
         {reward && (
-          <section className="rounded-3xl border border-teal-950/10 bg-surface p-6 shadow-sm">
+          <section className="rounded-3xl border border-border bg-surface p-6 shadow-sm">
             <p className="text-sm font-bold uppercase tracking-[.16em] text-brand">Journey reward</p>
             <h2 className="mt-2 text-2xl font-bold text-ink">
               +{reward.claim.xp_awarded} XP · {reward.item.item_name}
@@ -273,7 +273,7 @@ export function FocusDashboard() {
         <p className="text-7xl font-bold">
           {String(Math.floor(seconds / 60)).padStart(2, '0')}:{String(seconds % 60).padStart(2, '0')}
         </p>
-        <p className="mt-3 text-teal-100">
+        <p className="mt-3 text-primary-100">
           Block {session.activeIndex + 1} of {session.blocks.length} · {session.destination}
         </p>
         <div className="mt-7 flex gap-3">
@@ -318,22 +318,22 @@ function RpgSummary({
 }) {
   if (!profile)
     return (
-      <p className="rounded-2xl bg-teal-50 p-4 text-sm text-muted">
+      <p className="rounded-2xl border border-primary-100 bg-primary-50 p-4 text-sm text-text-secondary">
         Complete a focus session to begin your commute adventurer journey.
       </p>
     );
   return (
-    <section className="rounded-3xl border border-teal-950/10 bg-surface p-5 shadow-sm">
+    <section className="rounded-3xl border border-border bg-surface p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-bold uppercase tracking-[.16em] text-brand">Commute adventurer</p>
           <h2 className="mt-2 text-2xl font-bold text-ink">Level {profile.level}</h2>
         </div>
-        <span className="rounded-full bg-teal-100 px-3 py-1 text-sm font-bold text-brand-deep">
+        <span className="rounded-full bg-accent-100 px-3 py-1 text-sm font-bold text-accent-600">
           {profile.current_streak} day streak
         </span>
       </div>
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-teal-100">
+      <div className="mt-4 h-2 overflow-hidden rounded-full bg-primary-100">
         <div
           className="h-full rounded-full bg-brand"
           style={{ width: `${Math.min(100, (profile.xp / (profile.level * 100)) * 100)}%` }}
@@ -345,7 +345,7 @@ function RpgSummary({
       <div className="mt-5 grid grid-cols-3 gap-3">
         {(['focus', 'knowledge', 'resilience'] as const).map((stat) => (
           <button
-            className="rounded-xl border border-teal-950/10 p-3 text-left transition-colors hover:bg-teal-50 disabled:cursor-default"
+            className="rounded-xl border border-border bg-white p-3 text-left transition-colors hover:bg-primary-50 disabled:cursor-default"
             disabled={profile.unspent_stat_points === 0}
             key={stat}
             onClick={() => onAllocate(stat)}
@@ -367,7 +367,7 @@ function RpgSummary({
           {inventory.slice(0, 3).map((item) =>
             item.slot ? (
               <button
-                className="mr-2 cursor-pointer rounded-lg border border-teal-950/10 px-3 py-2 text-sm font-semibold text-brand-deep hover:bg-teal-50"
+                className="mr-2 cursor-pointer rounded-lg border border-primary-100 px-3 py-2 text-sm font-semibold text-brand-deep hover:bg-primary-50"
                 key={item.id}
                 onClick={() => onEquip(item.id)}
                 type="button"
@@ -397,9 +397,9 @@ function EncounterCard({
   if (!encounter) return null;
   return (
     <section className="rounded-3xl bg-brand-deep p-6 text-white shadow-sm">
-      <p className="text-sm font-bold uppercase tracking-[.16em] text-teal-100">Travel encounter</p>
+      <p className="text-sm font-bold uppercase tracking-[.16em] text-primary-100">Travel encounter</p>
       <h2 className="mt-2 text-2xl font-bold">{encounter.enemy_name}</h2>
-      <p className="mt-3 text-sm text-teal-100">
+      <p className="mt-3 text-sm text-primary-100">
         You {encounter.player_health} HP · opponent {encounter.enemy_health} HP · turn {encounter.turns}/3
       </p>
       {encounter.status !== 'pending' ? (
@@ -422,7 +422,7 @@ function EncounterCard({
 function ActionButton({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) {
   return (
     <button
-      className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-brand-deep transition-colors hover:bg-teal-50"
+      className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-brand-deep transition-colors hover:bg-primary-50"
       onClick={onClick}
       type="button"
     >

@@ -130,10 +130,10 @@ export function SettingsForm() {
         <AccountControls />
         <section
           aria-labelledby="locations-heading"
-          className="rounded-3xl border border-teal-950/10 bg-surface p-5 shadow-sm sm:p-7"
+          className="rounded-3xl border border-border bg-surface p-5 shadow-sm sm:p-7"
         >
           <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-100 text-brand-deep">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-100 text-brand-deep">
               <MapPin aria-hidden="true" className="size-5" />
             </span>
             <div>
@@ -165,10 +165,10 @@ export function SettingsForm() {
 
         <section
           aria-labelledby="journey-preferences-heading"
-          className="rounded-3xl border border-teal-950/10 bg-surface p-5 shadow-sm sm:p-7"
+          className="rounded-3xl border border-border bg-surface p-5 shadow-sm sm:p-7"
         >
           <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-100 text-brand-deep">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-100 text-brand-deep">
               <SlidersHorizontal aria-hidden="true" className="size-5" />
             </span>
             <div>
@@ -198,10 +198,10 @@ export function SettingsForm() {
 
         <section
           aria-labelledby="calendar-heading"
-          className="rounded-3xl border border-teal-950/10 bg-surface p-5 shadow-sm sm:p-7"
+          className="rounded-3xl border border-border bg-surface p-5 shadow-sm sm:p-7"
         >
           <div className="flex items-start gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-100 text-brand-deep">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-100 text-brand-deep">
               <CalendarDays aria-hidden="true" className="size-5" />
             </span>
             <div>
@@ -225,7 +225,7 @@ export function SettingsForm() {
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center sm:justify-between">
           <button
-            className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-teal-50"
+            className="inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-primary-50"
             onClick={reset}
             type="button"
           >
@@ -233,7 +233,7 @@ export function SettingsForm() {
             Restore defaults
           </button>
           <button
-            className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-accent px-5 py-3 font-bold text-white transition-colors duration-200 hover:bg-orange-600"
+            className="inline-flex min-h-12 cursor-pointer items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 font-bold text-white transition-colors duration-200 hover:bg-primary-600 active:bg-primary-700"
             type="submit"
           >
             <CheckCircle2 aria-hidden="true" className="size-5" />
@@ -244,7 +244,7 @@ export function SettingsForm() {
           aria-live="polite"
           className={
             notice
-              ? `rounded-xl px-4 py-3 text-sm font-semibold ${notice.kind === 'success' ? 'bg-teal-100 text-brand-deep' : 'bg-orange-100 text-orange-800'}`
+              ? `rounded-xl px-4 py-3 text-sm font-semibold ${notice.kind === 'success' ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning'}`
               : 'sr-only'
           }
         >
@@ -268,7 +268,7 @@ function CalendarConnection({
   onDisconnect: () => void;
   state: CalendarState;
 }) {
-  if (state === 'loading') return <div className="mt-6 h-12 animate-pulse rounded-xl bg-teal-100" />;
+  if (state === 'loading') return <div className="mt-6 h-12 animate-pulse rounded-xl bg-primary-100" />;
   if (state === 'connected')
     return (
       <div className="mt-6">
@@ -278,7 +278,7 @@ function CalendarConnection({
             Only events whose location matches HNU are used for commute planning.
           </span>
           <select
-            className="mt-3 min-h-12 w-full rounded-xl border border-teal-950/15 bg-white px-4 font-semibold text-ink outline-none transition-colors duration-200 hover:border-brand focus:border-brand"
+            className="mt-3 min-h-12 w-full rounded-xl border border-border bg-white px-4 font-semibold text-ink outline-none transition-colors duration-200 hover:border-brand focus:border-brand"
             id="calendar-id"
             onChange={(event) => onChange(event.target.value)}
             value={calendarId}
@@ -295,7 +295,7 @@ function CalendarConnection({
           </select>
         </label>
         <button
-          className="mt-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-teal-50"
+          className="mt-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-primary-50"
           onClick={onDisconnect}
           type="button"
         >
@@ -366,7 +366,7 @@ function CalendarConnection({
       />
     );
   return (
-    <div className="mt-6 rounded-2xl bg-teal-50 p-4">
+    <div className="mt-6 rounded-2xl border border-primary-100 bg-primary-50 p-4">
       <p className="font-bold text-brand-deep">Not connected</p>
       <p className="mt-1 text-sm leading-6 text-muted">
         Connect with Google to read calendar names and future university events. EnRoute requests read-only access.
@@ -384,7 +384,7 @@ function CalendarConnection({
 
 function CalendarIssue({ detail, title }: { detail: React.ReactNode; title: string }) {
   return (
-    <div className="mt-6 rounded-2xl bg-orange-50 p-4 text-sm leading-6 text-orange-900">
+    <div className="mt-6 rounded-2xl bg-warning-soft p-4 text-sm leading-6 text-text-secondary">
       <p className="font-bold">{title}</p>
       <p className="mt-1">{detail}</p>
     </div>
@@ -426,7 +426,7 @@ function AddressField({
           className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-brand"
         />
         <input
-          className="min-h-12 w-full rounded-xl border border-teal-950/15 bg-white py-3 pl-12 pr-4 text-sm font-semibold text-ink outline-none transition-colors duration-200 hover:border-brand focus:border-brand"
+          className="min-h-12 w-full rounded-xl border border-border bg-white py-3 pl-12 pr-4 text-sm font-semibold text-ink outline-none transition-colors duration-200 hover:border-brand focus:border-brand"
           id={id}
           onChange={(event) => onChange(event.target.value)}
           value={value}
@@ -439,7 +439,7 @@ function AddressField({
 function BufferOption({ checked, minutes, onChange }: { checked: boolean; minutes: number; onChange: () => void }) {
   return (
     <label
-      className={`relative flex min-h-20 cursor-pointer flex-col justify-center rounded-xl border p-3 transition-colors duration-200 ${checked ? 'border-brand bg-teal-50 text-brand-deep' : 'border-teal-950/15 bg-white text-ink hover:border-brand'}`}
+      className={`relative flex min-h-20 cursor-pointer flex-col justify-center rounded-xl border p-3 transition-colors duration-200 ${checked ? 'border-brand bg-primary-50 text-brand-deep' : 'border-border bg-white text-ink hover:border-brand'}`}
     >
       <input
         checked={checked}
@@ -458,10 +458,10 @@ function BufferOption({ checked, minutes, onChange }: { checked: boolean; minute
 function SettingsSkeleton() {
   return (
     <div aria-label="Loading settings" className="animate-pulse space-y-5">
-      <div className="h-7 w-48 rounded bg-teal-100" />
-      <div className="h-5 max-w-xl rounded bg-teal-100" />
-      <div className="h-72 rounded-3xl bg-teal-100" />
-      <div className="h-72 rounded-3xl bg-teal-100" />
+      <div className="h-7 w-48 rounded bg-primary-100" />
+      <div className="h-5 max-w-xl rounded bg-primary-100" />
+      <div className="h-72 rounded-3xl bg-primary-100" />
+      <div className="h-72 rounded-3xl bg-primary-100" />
     </div>
   );
 }

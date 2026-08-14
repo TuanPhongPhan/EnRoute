@@ -33,7 +33,7 @@ export function JourneyRouteSelector() {
           </p>
         </div>
         <Link
-          className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-teal-50"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-primary-50"
           href="/"
         >
           <span>Back to Today</span>
@@ -83,7 +83,7 @@ function RouteOption({
   return (
     <button
       aria-pressed={isSelected}
-      className={`w-full cursor-pointer rounded-3xl border p-5 text-left shadow-sm transition-colors duration-200 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand/25 sm:p-6 ${isSelected ? 'border-brand bg-teal-50' : 'border-teal-950/10 bg-surface hover:border-brand/60 hover:bg-teal-50/50'}`}
+      className={`w-full cursor-pointer rounded-3xl border p-5 text-left shadow-sm transition-colors duration-200 focus:outline-none focus-visible:ring-4 focus-visible:ring-brand/25 sm:p-6 ${isSelected ? 'border-brand bg-primary-50' : 'border-border bg-surface hover:border-brand/60 hover:bg-primary-50/50'}`}
       onClick={() => onChoose(journey.id)}
       type="button"
     >
@@ -96,7 +96,7 @@ function RouteOption({
           )}
           <span className="font-bold text-ink">{isSelected ? 'Selected route' : 'Choose this route'}</span>
           {isRecommended && (
-            <span className="rounded-full bg-teal-100 px-2.5 py-1 text-xs font-bold text-brand-deep">
+            <span className="rounded-full bg-accent-100 px-2.5 py-1 text-xs font-bold text-accent-600">
               Balanced recommendation
             </span>
           )}
@@ -114,7 +114,7 @@ function RouteOption({
           <time className="mt-1 block text-2xl font-bold tracking-tight text-ink">{formatTime(journey.arrival)}</time>
         </div>
       </div>
-      <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 border-t border-teal-950/10 pt-4 text-sm text-muted">
+      <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2 border-t border-border pt-4 text-sm text-muted">
         <span className="inline-flex items-center gap-2">
           <Clock3 aria-hidden="true" className="size-4 text-brand" />
           {journey.transfers === 0
@@ -140,15 +140,15 @@ function RouteOption({
 function JourneyLoading() {
   return (
     <div aria-label="Loading journey options" className="mx-auto max-w-3xl animate-pulse space-y-4">
-      <div className="h-10 w-72 rounded bg-teal-100" />
-      <div className="h-52 rounded-3xl bg-teal-100" />
-      <div className="h-52 rounded-3xl bg-teal-100" />
+      <div className="h-10 w-72 rounded bg-primary-100" />
+      <div className="h-52 rounded-3xl bg-primary-100" />
+      <div className="h-52 rounded-3xl bg-primary-100" />
     </div>
   );
 }
 function JourneyUnavailable() {
   return (
-    <div className="mx-auto max-w-2xl rounded-3xl border border-teal-950/10 bg-surface p-6 shadow-sm sm:p-8">
+    <div className="mx-auto max-w-2xl rounded-3xl border border-border bg-surface p-6 shadow-sm sm:p-8">
       <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">Journey</p>
       <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink">No route choices yet.</h1>
       <p className="mt-3 max-w-lg text-base leading-7 text-muted">

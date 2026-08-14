@@ -16,8 +16,8 @@ export function WeekDashboard() {
   if (!days)
     return (
       <div className="animate-pulse space-y-4">
-        <div className="h-10 w-56 rounded bg-teal-100" />
-        <div className="h-72 rounded-3xl bg-teal-100" />
+        <div className="h-10 w-56 rounded bg-primary-100" />
+        <div className="h-72 rounded-3xl bg-primary-100" />
       </div>
     );
   const uni = days
@@ -113,7 +113,7 @@ function hours(value: number) {
 }
 function Metric({ icon: Icon, label, value }: { icon: typeof Clock3; label: string; value: string }) {
   return (
-    <article className="rounded-2xl border border-teal-950/10 bg-surface p-5 shadow-sm">
+    <article className="rounded-2xl border border-border bg-surface p-5 shadow-sm">
       <Icon className="size-5 text-brand" />
       <p className="mt-3 text-sm font-semibold text-muted">{label}</p>
       <p className="mt-1 text-2xl font-bold text-ink">{value}</p>
@@ -122,7 +122,7 @@ function Metric({ icon: Icon, label, value }: { icon: typeof Clock3; label: stri
 }
 function DayCard({ day }: { day: Day }) {
   return (
-    <article className="rounded-3xl border border-teal-950/10 bg-surface p-5 shadow-sm">
+    <article className="rounded-3xl border border-border bg-surface p-5 shadow-sm">
       <h2 className="text-lg font-bold text-ink">
         {new Intl.DateTimeFormat('en-GB', {
           weekday: 'long',
@@ -144,11 +144,11 @@ function DayCard({ day }: { day: Day }) {
             ))}
           </div>
           {day.journey && (
-            <p className="mt-5 rounded-xl bg-teal-50 px-3 py-2 text-sm font-semibold text-brand-deep">
+            <p className="mt-5 rounded-xl bg-primary-50 px-3 py-2 text-sm font-semibold text-brand-deep">
               Leave home {time(day.journey.departure)} · {hours(day.journey.durationMinutes)} travel
             </p>
           )}
-          {day.error && <p className="mt-4 text-sm text-orange-800">Journey unavailable for this day.</p>}
+          {day.error && <p className="mt-4 text-sm text-warning">Journey unavailable for this day.</p>}
         </>
       ) : (
         <p className="mt-3 text-sm text-muted">No HNU classes.</p>

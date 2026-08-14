@@ -21,14 +21,14 @@ export function AccountControls() {
     setEmail(null);
   };
   return (
-    <section className="rounded-3xl border border-teal-950/10 bg-surface p-5 shadow-sm sm:p-7">
+    <section className="rounded-3xl border border-border bg-surface p-5 shadow-sm sm:p-7">
       <h2 className="text-xl font-bold tracking-tight text-ink">Account</h2>
       <p className="mt-1 text-sm leading-6 text-muted">
         {email ? `Signed in as ${email}` : 'Sign in to securely save Calendar access and enable future notifications.'}
       </p>
       {email ? (
         <button
-          className="mt-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-brand-deep hover:bg-teal-50"
+          className="mt-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-brand-deep hover:bg-primary-50"
           onClick={() => {
             void signOut();
           }}

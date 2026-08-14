@@ -89,15 +89,15 @@ export function NotificationSettings() {
 
   if (status === 'loading')
     return (
-      <section className="h-40 animate-pulse rounded-3xl bg-teal-100" aria-label="Loading notification settings" />
+      <section className="h-40 animate-pulse rounded-3xl bg-primary-100" aria-label="Loading notification settings" />
     );
   return (
     <section
       aria-labelledby="notifications-heading"
-      className="rounded-3xl border border-teal-950/10 bg-surface p-5 shadow-sm sm:p-7"
+      className="rounded-3xl border border-border bg-surface p-5 shadow-sm sm:p-7"
     >
       <div className="flex items-start gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-100 text-brand-deep">
+        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-100 text-brand-deep">
           {status === 'denied' ? (
             <BellOff aria-hidden="true" className="size-5" />
           ) : (
@@ -114,15 +114,15 @@ export function NotificationSettings() {
         </div>
       </div>
       {status === 'unsupported' ? (
-        <p className="mt-5 rounded-xl bg-orange-50 p-4 text-sm leading-6 text-orange-900">
+        <p className="mt-5 rounded-xl bg-warning-soft p-4 text-sm leading-6 text-text-secondary">
           This browser does not support push notifications. Install EnRoute on a supported device to enable them.
         </p>
       ) : (
         <>
-          <div className="mt-6 divide-y divide-teal-950/10 rounded-2xl border border-teal-950/10">
+          <div className="mt-6 divide-y divide-border rounded-2xl border border-border">
             {choices.map((choice) => (
               <label
-                className="flex cursor-pointer items-center justify-between gap-4 p-4 transition-colors duration-200 hover:bg-teal-50"
+                className="flex cursor-pointer items-center justify-between gap-4 p-4 transition-colors duration-200 hover:bg-primary-50"
                 key={choice.key}
               >
                 <span>
@@ -143,13 +143,13 @@ export function NotificationSettings() {
             ))}
           </div>
           {status === 'denied' && (
-            <p className="mt-4 text-sm leading-6 text-orange-800">
+            <p className="mt-4 text-sm leading-6 text-warning">
               Notifications are blocked by this browser. Enable them in your browser or device settings, then reload
               this page.
             </p>
           )}
           {status === 'error' && (
-            <p className="mt-4 text-sm leading-6 text-orange-800">
+            <p className="mt-4 text-sm leading-6 text-warning">
               We could not save notification settings. Please try again.
             </p>
           )}

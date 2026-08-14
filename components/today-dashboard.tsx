@@ -22,6 +22,13 @@ const legIcons = {
   regional_train: TrainFront,
   other: TrainFront,
 };
+const statusStyles = {
+  'On time': 'bg-success-soft text-success ring-1 ring-success/20',
+  'Minor delay': 'bg-warning-soft text-warning ring-1 ring-warning/20',
+  'Tight connection': 'bg-warning-soft text-warning ring-1 ring-warning/20',
+  'Connection at risk': 'bg-danger-soft text-danger ring-1 ring-danger/20',
+  'Late for class': 'bg-danger-soft text-danger ring-1 ring-danger/20',
+} as const;
 
 type TransportState = 'loading' | 'route_ready' | 'location_not_found' | 'no_route' | 'rate_limited' | 'unavailable';
 
@@ -49,8 +56,8 @@ export function TodayDashboard({
           </h1>
         </div>
         <div
-          aria-label="Journey status: on time"
-          className="inline-flex min-h-11 items-center gap-2 rounded-full bg-teal-100 px-4 text-sm font-bold text-brand-deep"
+          aria-label={`Journey status: ${commute.status}`}
+          className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-bold ${statusStyles[commute.status]}`}
         >
           <CheckCircle2 aria-hidden="true" className="size-4" />
           {commute.status}
@@ -61,18 +68,18 @@ export function TodayDashboard({
         <div className="overflow-hidden rounded-3xl bg-brand-deep p-6 text-white shadow-sm md:p-8">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.16em] text-teal-100">Leave home</p>
+              <p className="text-sm font-bold uppercase tracking-[0.16em] text-primary-100">Leave home</p>
               <p className="mt-3 text-6xl font-bold tracking-[-0.06em] sm:text-7xl">{commute.leaveHomeAt}</p>
             </div>
-            <Clock3 aria-hidden="true" className="mt-1 size-6 text-teal-100" />
+            <Clock3 aria-hidden="true" className="mt-1 size-6 text-primary-100" />
           </div>
           <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-white/20 pt-5">
-            <p className="text-sm text-teal-50">
+            <p className="text-sm text-primary-50">
               <span className="font-bold text-white">{commute.departureCountdown.label}</span>
               {!commute.departureCountdown.isDue && ' until you need to leave'}
             </p>
             <a
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-teal-50"
+              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-primary-50"
               href="#journey"
             >
               <span>Start commute</span>
@@ -81,7 +88,7 @@ export function TodayDashboard({
           </div>
         </div>
 
-        <article className="rounded-3xl border border-teal-950/10 bg-surface p-6 shadow-sm md:p-7">
+        <article className="rounded-3xl border border-border bg-surface p-6 shadow-sm md:p-7">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">Next class</p>
@@ -134,14 +141,14 @@ function JourneyTimeline({
   transportState: TransportState;
 }) {
   return (
-    <article id="journey" className="rounded-3xl border border-teal-950/10 bg-surface p-5 shadow-sm sm:p-7">
+    <article id="journey" className="rounded-3xl border border-border bg-surface p-5 shadow-sm sm:p-7">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">Your journey</p>
           <h2 className="mt-2 text-2xl font-bold tracking-tight text-ink">Home to HNU</h2>
         </div>
         <Link
-          className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-teal-50"
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-primary-50"
           href="/journey"
         >
           <span>View details</span>
@@ -154,7 +161,7 @@ function JourneyTimeline({
           <JourneyLeg key={leg.id} leg={leg} isLast={index === commute.legs.length - 1} />
         ))}
       </ol>
-      <div className="mt-5 flex items-center justify-between rounded-2xl bg-teal-50 px-4 py-3">
+      <div className="mt-5 flex items-center justify-between rounded-2xl bg-primary-50 px-4 py-3">
         <span className="text-sm font-semibold text-brand-deep">Arrive at HNU</span>
         <time className="text-xl font-bold tracking-tight text-ink">{commute.arrivalAt}</time>
       </div>
@@ -194,13 +201,13 @@ function TransportNote({
   };
   return (
     <div
-      className="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-900"
+      className="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-warning-soft px-3 py-2 text-xs font-semibold text-text-secondary ring-1 ring-warning/20"
       role="alert"
     >
       <span>{messages[state]}</span>
       {onRefresh && (
         <button
-          className="min-h-9 cursor-pointer rounded-lg bg-white px-3 py-1.5 text-brand-deep transition-colors duration-200 hover:bg-teal-50"
+          className="min-h-9 cursor-pointer rounded-lg bg-white px-3 py-1.5 text-brand-deep transition-colors duration-200 hover:bg-primary-50"
           onClick={onRefresh}
           type="button"
         >
@@ -220,16 +227,16 @@ function JourneyLeg({ leg, isLast }: { leg: CommuteLegView; isLast: boolean }) {
         <span className="mt-0.5 block text-xs text-muted">{leg.duration}</span>
       </div>
       <div className="relative flex h-full justify-center">
-        <span className="grid size-9 place-items-center rounded-full bg-teal-100 text-brand-deep">
+        <span className="grid size-9 place-items-center rounded-full bg-primary-100 text-brand-deep">
           <Icon aria-hidden="true" className="size-4" />
         </span>
-        {!isLast && <span aria-hidden="true" className="absolute bottom-[-1rem] top-9 w-px bg-teal-950/10" />}
+        {!isLast && <span aria-hidden="true" className="absolute bottom-[-1rem] top-9 w-px bg-border" />}
       </div>
       <div className="min-w-0">
         <p className="font-bold text-ink">{leg.label}</p>
         <p className="mt-0.5 text-sm leading-5 text-muted">{leg.detail}</p>
         {leg.delayMinutes > 0 && (
-          <p className="mt-1 text-xs font-semibold text-orange-800">+{leg.delayMinutes} min delay</p>
+          <p className="mt-1 text-xs font-semibold text-warning">+{leg.delayMinutes} min delay</p>
         )}
         {leg.platform && <p className="mt-1 text-xs font-semibold text-brand-deep">{leg.platform}</p>}
       </div>
@@ -240,8 +247,8 @@ function JourneyLeg({ leg, isLast }: { leg: CommuteLegView; isLast: boolean }) {
 
 function ArrivalSummary({ commute }: { commute: TodayCommute }) {
   return (
-    <aside className="rounded-3xl bg-[#fff7ed] p-6 shadow-sm md:p-7">
-      <p className="text-sm font-bold uppercase tracking-[0.16em] text-orange-700">Arrival buffer</p>
+    <aside className="rounded-3xl bg-accent-50 p-6 shadow-sm ring-1 ring-accent-100 md:p-7">
+      <p className="text-sm font-bold uppercase tracking-[0.16em] text-accent-600">Arrival buffer</p>
       <p className="mt-4 text-6xl font-bold tracking-[-0.06em] text-ink">
         {commute.bufferMinutes}
         <span className="ml-1 text-2xl tracking-tight">min</span>
@@ -250,7 +257,7 @@ function ArrivalSummary({ commute }: { commute: TodayCommute }) {
         You should reach HNU at <span className="font-bold text-ink">{commute.arrivalAt}</span>, before class starts at{' '}
         {commute.nextClass.startsAt}.
       </p>
-      <div className="mt-7 rounded-2xl border border-orange-200 bg-white/70 p-4">
+      <div className="mt-7 rounded-2xl border border-accent-100 bg-white p-4">
         <p className="text-sm font-bold text-ink">{commute.status}</p>
         <p className="mt-1 text-sm leading-6 text-muted">
           Calculated from your class start and preferred arrival buffer.
@@ -274,7 +281,7 @@ function NoCommuteState({
           ? 'Connect Google Calendar in Settings to calculate your next commute.'
           : 'We could not calculate a commute yet. Check your calendar connection and saved addresses.';
   return (
-    <section className="rounded-3xl border border-teal-950/10 bg-surface p-6 shadow-sm md:p-8">
+    <section className="rounded-3xl border border-border bg-surface p-6 shadow-sm md:p-8">
       <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">Today</p>
       <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink md:text-4xl">No commute to calculate.</h1>
       <p aria-live="polite" className="mt-3 max-w-xl text-base leading-7 text-muted">
