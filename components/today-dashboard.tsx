@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import type { CommuteLegView, TodayCommute } from '@/lib/commute-view';
+import { transportModeIconClasses } from '@/lib/transport-mode-presentation';
 
 const legIcons = {
   walk: Footprints,
@@ -156,7 +157,7 @@ function JourneyTimeline({
         </Link>
       </div>
       <TransportNote commute={commute} onRefresh={onRefresh} state={transportState} />
-      <ol className="mt-7 divide-y divide-teal-950/10">
+      <ol className="mt-7 divide-y divide-border">
         {commute.legs.map((leg, index) => (
           <JourneyLeg key={leg.id} leg={leg} isLast={index === commute.legs.length - 1} />
         ))}
@@ -227,7 +228,7 @@ function JourneyLeg({ leg, isLast }: { leg: CommuteLegView; isLast: boolean }) {
         <span className="mt-0.5 block text-xs text-muted">{leg.duration}</span>
       </div>
       <div className="relative flex h-full justify-center">
-        <span className="grid size-9 place-items-center rounded-full bg-primary-100 text-brand-deep">
+        <span className={`grid size-9 place-items-center rounded-full ${transportModeIconClasses[leg.mode]}`}>
           <Icon aria-hidden="true" className="size-4" />
         </span>
         {!isLast && <span aria-hidden="true" className="absolute bottom-[-1rem] top-9 w-px bg-border" />}
