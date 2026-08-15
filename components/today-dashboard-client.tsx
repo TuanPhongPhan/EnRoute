@@ -7,11 +7,13 @@ import { createCommuteRecommendation, rankFeasibleJourneys } from '@/lib/commute
 import { readCommutePreferences } from '@/lib/commute-preferences';
 import { readCurrentJourney, saveCurrentJourneys, selectedJourney } from '@/lib/current-journey';
 import { createTodayCommute, type TodayCommute } from '@/lib/commute-view';
+import { berlinDayRange } from '@/lib/return-journey';
 import type { TransportJourney } from '@/lib/transport-provider';
 import { readEventSnapshot, saveEventSnapshot } from '@/lib/offline-snapshot';
 
 type CalendarEvent = { id: string; title: string; startsAt: string; endsAt: string; location: string };
 type CalendarResponse = { event: CalendarEvent | null };
+type DayEventsResponse = { events: CalendarEvent[] };
 type CalendarState = 'loading' | 'connected' | 'disconnected' | 'no-event' | 'unavailable';
 type TransportState = 'loading' | 'route_ready' | 'location_not_found' | 'no_route' | 'rate_limited' | 'unavailable';
 type JourneyResponse = { journeys: TransportJourney[]; fetchedAt: string };
@@ -21,6 +23,7 @@ export function TodayDashboardClient() {
   const [event, setEvent] = useState<CalendarEvent | null>(null);
   const [calendarState, setCalendarState] = useState<CalendarState>('loading');
   const [transportState, setTransportState] = useState<TransportState>('loading');
+  const [returnClassEndsAt, setReturnClassEndsAt] = useState<string | undefined>();
   const [now, setNow] = useState(() => new Date());
 
   const refreshJourney = useCallback(async (nextEvent: CalendarEvent) => {
@@ -119,6 +122,28 @@ export function TodayDashboardClient() {
   }, [refreshJourney]);
 
   useEffect(() => {
+    const preferences = readCommutePreferences();
+    const { start, end } = berlinDayRange();
+    void fetch(
+      `/api/google/calendar/week-events?${new URLSearchParams({
+        calendarId: preferences.calendarId,
+        start: start.toISOString(),
+        end: end.toISOString(),
+      })}`,
+    )
+      .then(async (response) => {
+        if (!response.ok) return;
+        const events = ((await response.json()) as DayEventsResponse).events;
+        const lastClass = events.reduce<CalendarEvent | null>(
+          (latest, next) => (!latest || Date.parse(next.endsAt) > Date.parse(latest.endsAt) ? next : latest),
+          null,
+        );
+        setReturnClassEndsAt(lastClass?.endsAt);
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
     if (!event) return;
     const refreshWhenVisible = () => {
       if (document.visibilityState === 'visible') void refreshJourney(event);
@@ -141,6 +166,7 @@ export function TodayDashboardClient() {
       calendarState={calendarState}
       commute={commute}
       now={now}
+      returnClassEndsAt={returnClassEndsAt}
       onRefreshJourney={
         event
           ? () => {

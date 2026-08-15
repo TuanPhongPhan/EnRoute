@@ -2,23 +2,32 @@
 
 import { ArrowRight, CheckCircle2, Clock3, Footprints, Route, TrainFront } from 'lucide-react';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { readCurrentJourney, selectCurrentJourney, type CurrentJourney } from '@/lib/current-journey';
+import {
+  readCurrentJourney,
+  selectCurrentJourney,
+  travelDirection,
+  type CurrentJourney,
+  type TravelDirection,
+} from '@/lib/current-journey';
 import type { TransportJourney } from '@/lib/transport-provider';
 
 export function JourneyRouteSelector() {
+  const searchParams = useSearchParams();
+  const direction = travelDirection(searchParams.get('direction'));
   const [current, setCurrent] = useState<CurrentJourney | null | undefined>(undefined);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setCurrent(readCurrentJourney()), 0);
+    const timer = window.setTimeout(() => setCurrent(readCurrentJourney(direction)), 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [direction]);
 
   if (current === undefined) return <JourneyLoading />;
-  if (!current) return <JourneyUnavailable />;
+  if (!current) return <JourneyUnavailable direction={direction} />;
 
   function chooseRoute(id: string) {
-    setCurrent(selectCurrentJourney(id));
+    setCurrent(selectCurrentJourney(id, undefined, direction));
   }
 
   return (
@@ -26,10 +35,13 @@ export function JourneyRouteSelector() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">Journey</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink md:text-4xl">Choose your connection.</h1>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink md:text-4xl">
+            {direction === 'return' ? 'Choose your return home.' : 'Choose your connection.'}
+          </h1>
           <p className="mt-3 max-w-xl text-base leading-7 text-muted">
-            Compare regional-transport routes. EnRoute balances your arrival around 30 minutes before class, then you
-            can select the connection you want to use.
+            {direction === 'return'
+              ? 'Compare regional-transport routes home, then select the connection you want to use.'
+              : 'Compare regional-transport routes. EnRoute balances your arrival around 30 minutes before class, then you can select the connection you want to use.'}
           </p>
         </div>
         <Link
@@ -40,6 +52,11 @@ export function JourneyRouteSelector() {
           <ArrowRight aria-hidden="true" className="size-4" />
         </Link>
       </header>
+
+      <nav aria-label="Journey direction" className="mt-6 flex flex-wrap gap-2">
+        <DirectionLink active={direction === 'outbound'} direction="outbound" />
+        <DirectionLink active={direction === 'return'} direction="return" />
+      </nav>
 
       <section aria-labelledby="route-options-heading" className="mt-7">
         <h2 id="route-options-heading" className="sr-only">
@@ -97,7 +114,7 @@ function RouteOption({
           <span className="font-bold text-ink">{isSelected ? 'Selected route' : 'Choose this route'}</span>
           {isRecommended && (
             <span className="rounded-full bg-accent-100 px-2.5 py-1 text-xs font-bold text-accent-600">
-              Balanced recommendation
+              Recommended
             </span>
           )}
         </div>
@@ -146,13 +163,31 @@ function JourneyLoading() {
     </div>
   );
 }
-function JourneyUnavailable() {
+function DirectionLink({ active, direction }: { active: boolean; direction: TravelDirection }) {
+  const label = direction === 'outbound' ? 'To HNU' : 'Return home';
+  const href = direction === 'outbound' ? '/journey' : '/journey?direction=return';
+  return (
+    <Link
+      aria-current={active ? 'page' : undefined}
+      className={`inline-flex min-h-11 items-center rounded-xl px-4 py-2 text-sm font-bold transition-colors ${active ? 'bg-primary-100 text-brand-deep' : 'text-text-secondary hover:bg-primary-50 hover:text-brand-deep'}`}
+      href={href}
+    >
+      {label}
+    </Link>
+  );
+}
+
+function JourneyUnavailable({ direction }: { direction: TravelDirection }) {
   return (
     <div className="mx-auto max-w-2xl rounded-3xl border border-border bg-surface p-6 shadow-sm sm:p-8">
       <p className="text-sm font-bold uppercase tracking-[0.16em] text-brand">Journey</p>
-      <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink">No route choices yet.</h1>
+      <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink">
+        {direction === 'return' ? 'No return choices yet.' : 'No route choices yet.'}
+      </h1>
       <p className="mt-3 max-w-lg text-base leading-7 text-muted">
-        Open Today to calculate routes from your saved transit stops, then return here to choose one.
+        {direction === 'return'
+          ? 'Open Today, choose when you want to leave HNU, then calculate return routes home.'
+          : 'Open Today to calculate routes from your saved transit stops, then return here to choose one.'}
       </p>
       <Link
         className="mt-6 inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white transition-colors duration-200 hover:bg-brand-deep"

@@ -60,6 +60,15 @@ describe('current journey session', () => {
 
     expect(selectCurrentJourney('second', storage)?.fetchedAt).toBe(fetchedAt);
   });
+
+  it('keeps outbound and return journey choices separate', () => {
+    const storage = new MemoryStorage();
+    saveCurrentJourneys([firstJourney, secondJourney], storage);
+    saveCurrentJourneys([secondJourney], storage, undefined, '2030-08-10T06:00:00Z', 'return');
+
+    expect(selectedJourney(readCurrentJourney(storage))?.id).toBe('first');
+    expect(selectedJourney(readCurrentJourney('return', storage))?.id).toBe('second');
+  });
 });
 
 class MemoryStorage implements Storage {

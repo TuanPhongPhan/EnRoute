@@ -15,6 +15,7 @@ import { departureCountdown } from '@/lib/commute-engine';
 import type { CommuteLegView, TodayCommute } from '@/lib/commute-view';
 import { formatDepartureCountdown, formatLastUpdated } from '@/lib/commute-view';
 import { transportModeIconClasses } from '@/lib/transport-mode-presentation';
+import { ReturnHomePlanner } from '@/components/return-home-planner';
 
 const legIcons = {
   walk: Footprints,
@@ -40,15 +41,23 @@ export function TodayDashboard({
   commute,
   now,
   onRefreshJourney,
+  returnClassEndsAt,
   transportState,
 }: {
   calendarState: 'loading' | 'connected' | 'disconnected' | 'no-event' | 'unavailable';
   commute: TodayCommute | null;
   now: Date;
   onRefreshJourney?: () => void;
+  returnClassEndsAt?: string;
   transportState: TransportState;
 }) {
-  if (!commute) return <NoCommuteState calendarState={calendarState} />;
+  if (!commute)
+    return (
+      <div className="space-y-5 md:space-y-7">
+        <NoCommuteState calendarState={calendarState} />
+        {returnClassEndsAt && <ReturnHomePlanner lastClassEndsAt={returnClassEndsAt} />}
+      </div>
+    );
   const departurePrompt = formatDepartureCountdown(departureCountdown(commute.leaveHomeAtIso, now));
   return (
     <div className="space-y-5 md:space-y-7">
@@ -114,6 +123,8 @@ export function TodayDashboard({
           <CalendarNote state={calendarState} />
         </article>
       </section>
+
+      {returnClassEndsAt && <ReturnHomePlanner lastClassEndsAt={returnClassEndsAt} />}
 
       <section className="grid gap-5 lg:grid-cols-[1fr_19rem] xl:grid-cols-[1fr_22rem]">
         <JourneyTimeline commute={commute} now={now} onRefresh={onRefreshJourney} transportState={transportState} />
