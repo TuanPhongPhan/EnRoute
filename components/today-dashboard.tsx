@@ -11,7 +11,9 @@ import {
   TramFront,
 } from 'lucide-react';
 import Link from 'next/link';
+import { departureCountdown } from '@/lib/commute-engine';
 import type { CommuteLegView, TodayCommute } from '@/lib/commute-view';
+import { formatDepartureCountdown, formatLastUpdated } from '@/lib/commute-view';
 import { transportModeIconClasses } from '@/lib/transport-mode-presentation';
 
 const legIcons = {
@@ -36,15 +38,18 @@ type TransportState = 'loading' | 'route_ready' | 'location_not_found' | 'no_rou
 export function TodayDashboard({
   calendarState,
   commute,
+  now,
   onRefreshJourney,
   transportState,
 }: {
   calendarState: 'loading' | 'connected' | 'disconnected' | 'no-event' | 'unavailable';
   commute: TodayCommute | null;
+  now: Date;
   onRefreshJourney?: () => void;
   transportState: TransportState;
 }) {
   if (!commute) return <NoCommuteState calendarState={calendarState} />;
+  const departurePrompt = formatDepartureCountdown(departureCountdown(commute.leaveHomeAtIso, now));
   return (
     <div className="space-y-5 md:space-y-7">
       <section aria-labelledby="today-heading" className="flex flex-wrap items-end justify-between gap-3">
@@ -75,9 +80,10 @@ export function TodayDashboard({
             <Clock3 aria-hidden="true" className="mt-1 size-6 text-primary-100" />
           </div>
           <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-white/20 pt-5">
-            <p className="text-sm text-primary-50">
-              <span className="font-bold text-white">{commute.departureCountdown.label}</span>
-              {!commute.departureCountdown.isDue && ' until you need to leave'}
+            <p
+              className={`inline-flex min-h-11 items-center rounded-xl px-3 text-base font-bold ${departurePrompt.isDue ? 'bg-accent-500 text-white' : 'bg-white/10 text-white'}`}
+            >
+              {departurePrompt.label}
             </p>
             <a
               className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-primary-50"
@@ -110,7 +116,7 @@ export function TodayDashboard({
       </section>
 
       <section className="grid gap-5 lg:grid-cols-[1fr_19rem] xl:grid-cols-[1fr_22rem]">
-        <JourneyTimeline commute={commute} onRefresh={onRefreshJourney} transportState={transportState} />
+        <JourneyTimeline commute={commute} now={now} onRefresh={onRefreshJourney} transportState={transportState} />
         <ArrivalSummary commute={commute} />
       </section>
     </div>
@@ -134,10 +140,12 @@ function CalendarNote({ state }: { state: 'loading' | 'connected' | 'disconnecte
 
 function JourneyTimeline({
   commute,
+  now,
   onRefresh,
   transportState,
 }: {
   commute: TodayCommute;
+  now: Date;
   onRefresh?: () => void;
   transportState: TransportState;
 }) {
@@ -156,7 +164,7 @@ function JourneyTimeline({
           <ArrowRight aria-hidden="true" className="size-4" />
         </Link>
       </div>
-      <TransportNote commute={commute} onRefresh={onRefresh} state={transportState} />
+      <TransportNote commute={commute} now={now} onRefresh={onRefresh} state={transportState} />
       <ol className="mt-7 divide-y divide-border">
         {commute.legs.map((leg, index) => (
           <JourneyLeg key={leg.id} leg={leg} isLast={index === commute.legs.length - 1} />
@@ -172,10 +180,12 @@ function JourneyTimeline({
 
 function TransportNote({
   commute,
+  now,
   onRefresh,
   state,
 }: {
   commute: TodayCommute;
+  now: Date;
   onRefresh?: () => void;
   state: TransportState;
 }) {
@@ -197,8 +207,8 @@ function TransportNote({
   const messages = {
     location_not_found: 'One of your saved addresses could not be found. Update it in Settings.',
     no_route: 'No regional-transport route reaches HNU within your preferred arrival buffer.',
-    rate_limited: 'Live data is rate-limited. Showing your last calculated journey.',
-    unavailable: 'Live data is unavailable. Showing your last calculated journey.',
+    rate_limited: `Transitous is rate-limited. ${formatLastUpdated(commute.updatedAt, now)}.`,
+    unavailable: `Transitous is unavailable. ${formatLastUpdated(commute.updatedAt, now)}.`,
   };
   return (
     <div

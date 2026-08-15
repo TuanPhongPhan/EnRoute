@@ -1,9 +1,9 @@
 import type { TransportJourney, TransportJourneyLeg } from '@/lib/transport-provider';
 
 // Bump this key whenever the persisted Journey shape changes; stale journeys must never be presented as live.
-const storageKey = 'enroute:current-journey:v3';
+const storageKey = 'enroute:current-journey:v4';
 
-export type CurrentJourney = { journeys: TransportJourney[]; selectedJourneyId: string };
+export type CurrentJourney = { journeys: TransportJourney[]; selectedJourneyId: string; fetchedAt: string };
 
 export function readCurrentJourney(storage = browserStorage()): CurrentJourney | null {
   if (!storage) return null;
@@ -25,12 +25,13 @@ export function saveCurrentJourneys(
   journeys: TransportJourney[],
   storage = browserStorage(),
   preferredJourneyId?: string,
+  fetchedAt = new Date().toISOString(),
 ): CurrentJourney | null {
   const selectedJourneyId = journeys.some((journey) => journey.id === preferredJourneyId)
     ? preferredJourneyId
     : journeys[0]?.id;
   if (!storage || !selectedJourneyId) return null;
-  const current = { journeys, selectedJourneyId };
+  const current = { journeys, selectedJourneyId, fetchedAt };
   storage.setItem(storageKey, JSON.stringify(current));
   return current;
 }
@@ -56,6 +57,8 @@ function isCurrentJourney(value: unknown): value is CurrentJourney {
   const candidate = value as Record<string, unknown>;
   return (
     typeof candidate.selectedJourneyId === 'string' &&
+    typeof candidate.fetchedAt === 'string' &&
+    Number.isFinite(Date.parse(candidate.fetchedAt)) &&
     Array.isArray(candidate.journeys) &&
     candidate.journeys.every(isTransportJourney) &&
     candidate.journeys.some((journey) => journey.id === candidate.selectedJourneyId)

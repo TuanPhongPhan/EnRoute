@@ -52,6 +52,14 @@ describe('current journey session', () => {
     expect(selectedJourney(current)?.id).toBe('first');
     expect(selectedJourney(refreshed)?.id).toBe('second');
   });
+
+  it('preserves the successful Transitous fetch time when selecting a route', () => {
+    const storage = new MemoryStorage();
+    const fetchedAt = '2030-08-10T05:55:00Z';
+    saveCurrentJourneys([firstJourney, secondJourney], storage, undefined, fetchedAt);
+
+    expect(selectCurrentJourney('second', storage)?.fetchedAt).toBe(fetchedAt);
+  });
 });
 
 class MemoryStorage implements Storage {

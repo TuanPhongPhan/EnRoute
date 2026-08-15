@@ -18,6 +18,7 @@ export type TodayCommute = {
   greeting: string;
   nextClass: { name: string; startsAt: string; endsAt: string; location: string };
   leaveHomeAt: string;
+  leaveHomeAtIso: string;
   departureCountdown: {
     label: string;
     isDue: boolean;
@@ -34,6 +35,7 @@ export function createTodayCommute(
   event: GoogleCalendarEvent,
   recommendation: CommuteRecommendation,
   now = new Date(),
+  transportUpdatedAt = now,
 ): TodayCommute {
   const journey = recommendation.journey;
   const countdown = departureCountdown(recommendation.leaveHomeAt, now);
@@ -48,6 +50,7 @@ export function createTodayCommute(
       location: event.location,
     },
     leaveHomeAt: formatTime(recommendation.leaveHomeAt),
+    leaveHomeAtIso: recommendation.leaveHomeAt,
     departureCountdown: formatDepartureCountdown(countdown),
     arrivalAt: formatTime(recommendation.expectedArrivalAt),
     bufferMinutes: recommendation.bufferMinutes,
@@ -62,7 +65,7 @@ export function createTodayCommute(
               ? 'Tight connection'
               : 'On time',
     liveDataAvailable: journey.hasRealtime ?? false,
-    updatedAt: now.toISOString(),
+    updatedAt: transportUpdatedAt.toISOString(),
     legs: journey.legs.map((leg) => ({
       id: `${leg.actualDeparture}-${leg.actualArrival}-${leg.label}-${leg.origin}-${leg.destination}`,
       mode: leg.mode,
@@ -107,7 +110,16 @@ export function formatDepartureCountdown(minutes: number): {
     return { label: 'Leave now', isDue: true };
   }
 
-  return { label: formatDuration(minutes), isDue: false };
+  return { label: `Leave in ${formatDuration(minutes)}`, isDue: false };
+}
+
+export function formatLastUpdated(updatedAt: string, now = new Date()) {
+  const elapsedMinutes = Math.max(0, Math.floor((now.getTime() - Date.parse(updatedAt)) / 60_000));
+  if (elapsedMinutes < 1) return 'Last updated just now';
+  if (elapsedMinutes < 60) return `Last updated ${elapsedMinutes} min ago`;
+
+  const elapsedHours = Math.floor(elapsedMinutes / 60);
+  return `Last updated ${elapsedHours} h ago`;
 }
 
 function formatTime(value: string) {

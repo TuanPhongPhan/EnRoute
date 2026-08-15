@@ -21,6 +21,7 @@ export function TodayDashboardClient() {
   const [event, setEvent] = useState<CalendarEvent | null>(null);
   const [calendarState, setCalendarState] = useState<CalendarState>('loading');
   const [transportState, setTransportState] = useState<TransportState>('loading');
+  const [now, setNow] = useState(() => new Date());
 
   const refreshJourney = useCallback(async (nextEvent: CalendarEvent) => {
     const preferences = readCommutePreferences();
@@ -44,7 +45,12 @@ export function TodayDashboardClient() {
         setTransportState('no_route');
         return;
       }
-      const current = saveCurrentJourneys(ranked, undefined, readCurrentJourney()?.selectedJourneyId);
+      const current = saveCurrentJourneys(
+        ranked,
+        undefined,
+        readCurrentJourney()?.selectedJourneyId,
+        payload.fetchedAt,
+      );
       const journey = selectedJourney(current);
       if (!journey) {
         setTransportState('unavailable');
@@ -54,6 +60,7 @@ export function TodayDashboardClient() {
         createTodayCommute(
           nextEvent,
           createCommuteRecommendation(journey, nextEvent.startsAt, preferences.arrivalBufferMinutes),
+          new Date(),
           new Date(payload.fetchedAt),
         ),
       );
@@ -76,13 +83,15 @@ export function TodayDashboardClient() {
   useEffect(() => {
     const cached = readEventSnapshot();
     if (cached) {
-      const journey = selectedJourney(readCurrentJourney());
+      const current = readCurrentJourney();
+      const journey = selectedJourney(current);
       if (journey)
         setCommute(
           createTodayCommute(
             cached.event,
             createCommuteRecommendation(journey, cached.event.startsAt, readCommutePreferences().arrivalBufferMinutes),
-            new Date(cached.fetchedAt),
+            new Date(),
+            new Date(current?.fetchedAt ?? cached.fetchedAt),
           ),
         );
       setEvent(cached.event);
@@ -122,10 +131,16 @@ export function TodayDashboardClient() {
     };
   }, [event, refreshJourney]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   return (
     <TodayDashboard
       calendarState={calendarState}
       commute={commute}
+      now={now}
       onRefreshJourney={
         event
           ? () => {
