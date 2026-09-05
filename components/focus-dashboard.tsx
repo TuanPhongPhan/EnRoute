@@ -1,284 +1,323 @@
 'use client';
-/* eslint-disable react-hooks/purity, react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/set-state-in-effect */
 
-import { useEffect, useState, type ReactNode } from 'react';
-import { Pause, Play, Shield, SkipForward, Sparkles, Sword, Trophy, WifiOff } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowRight, BookOpen, CheckCircle2, Coffee, Pause, Play, RotateCcw, TimerReset, WifiOff } from 'lucide-react';
 
 import { readCurrentJourney, selectedJourney } from '@/lib/current-journey';
 import {
-  blocksFor,
+  breakMinutes,
   clearFocus,
-  focusActivities,
+  createFocusSession,
+  journeyFitMinutes,
+  pomodoroMinutes,
   readFocus,
+  readPendingFocusCompletions,
   remainingSeconds,
+  removePendingFocusCompletion,
   saveFocus,
+  savePendingFocusCompletion,
   usableLeg,
-  type FocusActivity,
   type FocusSession,
+  type PendingFocusCompletion,
 } from '@/lib/focus-session';
-import {
-  createFocusSessionId,
-  focusMinutes,
-  type CombatAction,
-  type FocusRewardResult,
-  type RpgEncounter,
-  type RpgItem,
-  type RpgProfile,
-  xpToNextLevel,
-} from '@/lib/focus-rpg';
+import { type FocusSummary } from '@/lib/focus-statistics';
+
+type Completion = PendingFocusCompletion & { phase: 'focus' | 'break' };
+type SyncStatus = 'idle' | 'syncing' | 'saved-locally' | 'saved';
 
 export function FocusDashboard() {
   const [session, setSession] = useState<FocusSession | null>(null);
-  const [activity, setActivity] = useState<FocusActivity>('Study');
-  const [now, setNow] = useState(Date.now());
+  const [title, setTitle] = useState('');
+  const [duration, setDuration] = useState<number>(25);
+  const [now, setNow] = useState(0);
   const [online, setOnline] = useState(true);
-  const [profile, setProfile] = useState<RpgProfile | null>(null);
-  const [inventory, setInventory] = useState<RpgItem[]>([]);
-  const [encounter, setEncounter] = useState<RpgEncounter | null>(null);
-  const [reward, setReward] = useState<FocusRewardResult | null>(null);
-  const [rewardState, setRewardState] = useState<'idle' | 'claiming' | 'offline' | 'error'>('idle');
+  const [summary, setSummary] = useState<FocusSummary | null>(null);
+  const [completion, setCompletion] = useState<Completion | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
+  const finishingSessionId = useRef<string | null>(null);
 
-  const loadRpg = async () => {
-    const response = await fetch('/api/focus-rpg');
+  const journey = selectedJourney(readCurrentJourney());
+  const leg = usableLeg(journey);
+  const fitMinutes = journeyFitMinutes(journey);
+
+  const loadSummary = useCallback(async () => {
+    const response = await fetch('/api/focus-sessions');
     if (!response.ok) return;
-    const data = (await response.json()) as {
-      profile: RpgProfile | null;
-      inventory: RpgItem[];
-      encounter: RpgEncounter | null;
-    };
-    setProfile(data.profile);
-    setInventory(data.inventory);
-    setEncounter(data.encounter);
-  };
+    const data = (await response.json()) as { summary: FocusSummary };
+    setSummary(data.summary);
+  }, []);
+
+  const syncCompletion = useCallback(async (item: PendingFocusCompletion) => {
+    setSyncStatus('syncing');
+    try {
+      const response = await fetch('/api/focus-sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(item),
+      });
+      if (!response.ok) throw new Error('focus_session_not_saved');
+
+      const data = (await response.json()) as { summary: FocusSummary };
+      removePendingFocusCompletion(item.clientSessionId);
+      setSummary(data.summary);
+      setSyncStatus('saved');
+    } catch {
+      savePendingFocusCompletion(item);
+      setSyncStatus('saved-locally');
+    }
+  }, []);
+
+  const syncPendingCompletions = useCallback(async () => {
+    if (!navigator.onLine) return;
+    const pending = readPendingFocusCompletions();
+    for (const item of pending) await syncCompletion(item);
+  }, [syncCompletion]);
+
+  const commit = useCallback((next: FocusSession | null) => {
+    setSession(next);
+    if (next) saveFocus(next);
+    else clearFocus();
+  }, []);
+
+  const finishSession = useCallback(
+    (activeSession: FocusSession) => {
+      if (finishingSessionId.current === activeSession.clientSessionId) return;
+      finishingSessionId.current = activeSession.clientSessionId;
+      commit(null);
+
+      const completed: Completion = {
+        phase: activeSession.phase,
+        clientSessionId: activeSession.clientSessionId,
+        title: activeSession.title,
+        plannedMinutes: activeSession.plannedMinutes,
+        startedAt: activeSession.startedAt,
+        destination: activeSession.destination,
+      };
+      setCompletion(completed);
+
+      if (activeSession.phase === 'focus') void syncCompletion(completed);
+    },
+    [commit, syncCompletion],
+  );
 
   useEffect(() => {
     setSession(readFocus());
     setOnline(navigator.onLine);
-    void loadRpg();
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    const update = () => setOnline(navigator.onLine);
-    addEventListener('online', update);
-    addEventListener('offline', update);
+    setNow(Date.now());
+    void loadSummary();
+    void syncPendingCompletions();
+
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    const updateOnline = () => {
+      setOnline(navigator.onLine);
+      if (navigator.onLine) void syncPendingCompletions();
+    };
+    addEventListener('online', updateOnline);
+    addEventListener('offline', updateOnline);
+
     return () => {
       clearInterval(timer);
-      removeEventListener('online', update);
-      removeEventListener('offline', update);
+      removeEventListener('online', updateOnline);
+      removeEventListener('offline', updateOnline);
     };
-  }, []);
+  }, [loadSummary, syncPendingCompletions]);
 
-  const leg = usableLeg(selectedJourney(readCurrentJourney()));
-  const commit = (next: FocusSession | null) => {
-    setSession(next);
-    if (next) saveFocus(next);
-    else clearFocus();
-  };
+  const seconds = session ? remainingSeconds(session, now) : 0;
 
-  async function claimRewards() {
-    if (!session?.completed) return;
-    if (!online) {
-      localStorage.setItem('enroute:focus-rpg-pending:v1', JSON.stringify(session));
-      setRewardState('offline');
-      return;
-    }
-    setRewardState('claiming');
-    try {
-      const response = await fetch('/api/focus-rpg', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'claim',
-          sessionId: session.clientSessionId,
-          activity: session.activity,
-          minutes: focusMinutes(session),
-        }),
-      });
-      if (!response.ok) throw new Error('claim_failed');
-      const result = (await response.json()) as FocusRewardResult;
-      setReward(result);
-      setProfile(result.profile);
-      setEncounter(result.encounter);
-      setInventory((items) => [result.item, ...items.filter((item) => item.id !== result.item.id)]);
-      localStorage.removeItem('enroute:focus-rpg-pending:v1');
-      setRewardState('idle');
-    } catch {
-      setRewardState('error');
-    }
-  }
+  useEffect(() => {
+    if (session && !session.pausedAt && seconds === 0) finishSession(session);
+  }, [finishSession, seconds, session]);
 
-  async function takeCombatTurn(action: CombatAction) {
-    if (!encounter || encounter.status !== 'pending') return;
-    const response = await fetch('/api/focus-rpg', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'combat', encounterId: encounter.id, combatAction: action }),
-    });
-    if (!response.ok) return;
-    setEncounter(((await response.json()) as { encounter: RpgEncounter }).encounter);
-  }
-
-  async function allocateStat(stat: 'focus' | 'knowledge' | 'resilience') {
-    const response = await fetch('/api/focus-rpg', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'allocate', stat }),
-    });
-    if (response.ok) setProfile(((await response.json()) as { profile: RpgProfile }).profile);
-  }
-
-  async function equipItem(itemId: string) {
-    const response = await fetch('/api/focus-rpg', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'equip', itemId }),
-    });
-    if (!response.ok) return;
-    const { item } = (await response.json()) as { item: RpgItem };
-    setInventory((items) =>
-      items.map((current) => ({
-        ...current,
-        is_equipped: current.slot === item.slot ? current.id === item.id : current.is_equipped,
-      })),
+  function startFocus(minutes: number) {
+    finishingSessionId.current = null;
+    setCompletion(null);
+    setSyncStatus('idle');
+    commit(
+      createFocusSession({
+        title,
+        plannedMinutes: minutes,
+        destination: leg?.destination ?? 'your next stop',
+      }),
     );
   }
 
-  const rpg = <RpgSummary inventory={inventory} onAllocate={allocateStat} onEquip={equipItem} profile={profile} />;
+  function startBreak() {
+    finishingSessionId.current = null;
+    setCompletion(null);
+    commit(
+      createFocusSession({
+        title: 'Short break',
+        plannedMinutes: breakMinutes,
+        destination: completion?.destination ?? leg?.destination ?? 'your next stop',
+        phase: 'break',
+      }),
+    );
+  }
+
+  if (completion) {
+    const isBreak = completion.phase === 'break';
+    return (
+      <main className="space-y-6">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-[.16em] text-brand">Focus</p>
+          <h1 className="mt-2 text-3xl font-bold text-ink">{isBreak ? 'Break complete.' : 'Session complete.'}</h1>
+          <p className="mt-3 text-text-secondary">
+            {isBreak
+              ? 'Ready when you are for the next focused block.'
+              : `${completion.plannedMinutes} focused minutes logged for ${completion.title}.`}
+          </p>
+        </div>
+
+        {!isBreak && (
+          <section className="rounded-3xl border border-primary-100 bg-primary-50 p-5 text-text-secondary">
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-success" />
+              <div>
+                <p className="font-bold text-ink">
+                  {syncStatus === 'syncing'
+                    ? 'Saving your session…'
+                    : syncStatus === 'saved'
+                      ? 'Saved to your focus history.'
+                      : 'Saved on this device.'}
+                </p>
+                {syncStatus === 'saved-locally' && (
+                  <p className="mt-1 text-sm">It will sync to your account when the connection is available.</p>
+                )}
+              </div>
+            </div>
+          </section>
+        )}
+
+        <div className="flex flex-wrap gap-3">
+          {!isBreak && (
+            <button
+              className="inline-flex min-h-12 cursor-pointer items-center gap-2 rounded-xl bg-brand px-5 py-3 font-bold text-white transition-colors hover:bg-brand-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+              onClick={startBreak}
+              type="button"
+            >
+              <Coffee className="size-5" /> Take a {breakMinutes}-min break
+            </button>
+          )}
+          <button
+            className="inline-flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border border-brand bg-surface px-5 py-3 font-bold text-brand-deep transition-colors hover:bg-primary-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            onClick={() => {
+              finishingSessionId.current = null;
+              setCompletion(null);
+              setSyncStatus('idle');
+            }}
+            type="button"
+          >
+            <ArrowRight className="size-5" /> {isBreak ? 'Start focus' : 'Another focus block'}
+          </button>
+        </div>
+      </main>
+    );
+  }
 
   if (!session)
     return (
       <main className="space-y-6">
-        <p className="text-sm font-bold uppercase tracking-[.16em] text-brand">Focus</p>
-        <h1 className="mt-2 text-3xl font-bold text-ink">Make train time count.</h1>
-        {!leg ? (
-          <p className="rounded-2xl border border-primary-100 bg-primary-50 p-5 text-text-secondary">
-            Choose a journey with a train leg on the Journey screen to build a focus plan.
-          </p>
-        ) : (
-          <section className="rounded-3xl border border-border bg-surface p-6 shadow-sm">
-            <p className="text-muted">
-              You have {Math.round((Date.parse(leg.actualArrival) - Date.parse(leg.actualDeparture)) / 60_000)} min
-              before {leg.destination}.
-            </p>
-            <label className="mt-5 block font-bold text-ink">
-              Activity
-              <select
-                className="mt-2 min-h-12 w-full rounded-xl border p-3"
-                value={activity}
-                onChange={(event) => setActivity(event.target.value as FocusActivity)}
-              >
-                {focusActivities.map((item) => (
-                  <option key={item}>{item}</option>
-                ))}
-              </select>
-            </label>
-            <button
-              className="mt-5 inline-flex min-h-12 cursor-pointer items-center gap-2 rounded-xl bg-accent px-5 py-3 font-bold text-white"
-              onClick={() =>
-                commit({
-                  activity,
-                  blocks: blocksFor(
-                    Math.round((Date.parse(leg.actualArrival) - Date.parse(leg.actualDeparture)) / 60_000),
-                  ),
-                  activeIndex: 0,
-                  startedAt: new Date().toISOString(),
-                  pausedMs: 0,
-                  completed: false,
-                  destination: leg.destination,
-                  clientSessionId: createFocusSessionId(),
-                })
-              }
-              type="button"
-            >
-              <Play className="size-5" /> Start focus session
-            </button>
-          </section>
-        )}
-        {rpg}
-      </main>
-    );
-
-  const seconds = remainingSeconds(session, now);
-  const block = session.blocks[session.activeIndex];
-  const advance = () => {
-    const next = session.activeIndex + 1;
-    commit(
-      next >= session.blocks.length
-        ? { ...session, completed: true }
-        : { ...session, activeIndex: next, startedAt: new Date().toISOString(), pausedMs: 0, pausedAt: undefined },
-    );
-  };
-
-  if (session.completed)
-    return (
-      <main className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-ink">Session complete.</h1>
-          <p className="mt-3 text-muted">Nice work on your way to {session.destination}.</p>
+          <p className="text-sm font-bold uppercase tracking-[.16em] text-brand">Focus</p>
+          <h1 className="mt-2 text-3xl font-bold text-ink">Make train time count.</h1>
+          <p className="mt-3 max-w-xl text-text-secondary">
+            A simple Pomodoro timer for the part of your commute where you can concentrate.
+          </p>
         </div>
-        {!reward && (
+
+        <section className="rounded-3xl border border-border bg-surface p-5 shadow-sm sm:p-6">
+          {leg ? (
+            <p className="rounded-2xl border border-primary-100 bg-primary-50 px-4 py-3 text-sm text-text-secondary">
+              Your selected connection has{' '}
+              {Math.round((Date.parse(leg.actualArrival) - Date.parse(leg.actualDeparture)) / 60_000)} min before{' '}
+              {leg.destination}.
+            </p>
+          ) : (
+            <p className="rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-text-secondary">
+              Select a journey first to fit a session around your train time. You can still choose a 25- or 50-minute
+              timer.
+            </p>
+          )}
+
+          <label className="mt-5 block text-sm font-bold text-ink" htmlFor="focus-title">
+            What are you working on? <span className="font-normal text-muted">Optional</span>
+          </label>
+          <input
+            className="mt-2 min-h-12 w-full rounded-xl border border-border bg-surface px-3 text-ink outline-none transition-colors placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-primary-100"
+            id="focus-title"
+            maxLength={120}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="Study session"
+            value={title}
+          />
+
+          <fieldset className="mt-6">
+            <legend className="text-sm font-bold text-ink">Choose a duration</legend>
+            <div className="mt-3 grid grid-cols-3 gap-2 sm:max-w-md">
+              {pomodoroMinutes.map((minutes) => (
+                <DurationButton
+                  active={duration === minutes}
+                  key={minutes}
+                  label={`${minutes} min`}
+                  onClick={() => setDuration(minutes)}
+                />
+              ))}
+              <DurationButton
+                active={duration === fitMinutes}
+                disabled={!fitMinutes}
+                label={fitMinutes ? `Fit journey · ${fitMinutes}` : 'Fit journey'}
+                onClick={() => fitMinutes && setDuration(fitMinutes)}
+              />
+            </div>
+          </fieldset>
+
           <button
-            className="inline-flex min-h-12 cursor-pointer items-center gap-2 rounded-xl bg-accent px-5 py-3 font-bold text-white disabled:opacity-60"
-            disabled={rewardState === 'claiming'}
-            onClick={() => void claimRewards()}
+            className="mt-6 inline-flex min-h-12 w-full cursor-pointer items-center justify-center gap-2 rounded-xl bg-brand px-5 py-3 font-bold text-white transition-colors hover:bg-brand-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand sm:w-auto"
+            onClick={() => startFocus(duration)}
             type="button"
           >
-            <Trophy className="size-5" /> {rewardState === 'claiming' ? 'Claiming rewards…' : 'Claim travel rewards'}
+            <Play className="size-5" /> Start {duration}-minute focus
           </button>
-        )}
-        {rewardState === 'offline' && (
-          <p className="text-sm text-muted">Reward saved on this device and ready to claim when you are online.</p>
-        )}
-        {rewardState === 'error' && (
-          <p className="text-sm text-warning">
-            We could not save your reward yet. Try again when your connection is ready.
-          </p>
-        )}
-        {reward && (
-          <section className="rounded-3xl border border-border bg-surface p-6 shadow-sm">
-            <p className="text-sm font-bold uppercase tracking-[.16em] text-brand">Journey reward</p>
-            <h2 className="mt-2 text-2xl font-bold text-ink">
-              +{reward.claim.xp_awarded} XP · {reward.item.item_name}
-            </h2>
-            <p className="mt-2 text-sm text-muted">
-              Your {reward.item.rarity} find is safely stored in your travel kit.
-            </p>
-          </section>
-        )}
-        <EncounterCard encounter={encounter} onAction={takeCombatTurn} />
-        {rpg}
-        <button
-          className="rounded-xl bg-brand px-5 py-3 font-bold text-white"
-          onClick={() => commit(null)}
-          type="button"
-        >
-          Start another session
-        </button>
+        </section>
+
+        <FocusStats summary={summary} />
       </main>
     );
 
   return (
     <main className="space-y-6">
-      <div className="flex justify-between">
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-bold uppercase tracking-[.16em] text-brand">Focus</p>
-          <h1 className="mt-2 text-3xl font-bold text-ink">{block.kind === 'focus' ? session.activity : 'Break'}</h1>
+          <p className="text-sm font-bold uppercase tracking-[.16em] text-brand">
+            {session.phase === 'focus' ? 'Focus' : 'Break'}
+          </p>
+          <h1 className="mt-2 text-3xl font-bold text-ink">
+            {session.phase === 'focus' ? session.title : 'Take five.'}
+          </h1>
         </div>
         {!online && (
-          <span className="inline-flex items-center gap-2 text-sm text-muted">
-            <WifiOff className="size-4" />
-            Offline
+          <span className="inline-flex items-center gap-2 rounded-full bg-surface-muted px-3 py-2 text-sm font-semibold text-text-secondary">
+            <WifiOff className="size-4" /> Offline
           </span>
         )}
       </div>
-      <section className="rounded-3xl bg-brand-deep p-8 text-white">
-        <p className="text-7xl font-bold">
+
+      <section className="rounded-3xl bg-brand-deep p-6 text-white shadow-sm sm:p-8">
+        <div className="flex items-center justify-between gap-4 text-primary-100">
+          <span className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-[.16em]">
+            <TimerReset className="size-4" />{' '}
+            {session.pausedAt ? 'Paused' : session.phase === 'focus' ? 'Focus time' : 'Short break'}
+          </span>
+          <span className="text-sm font-semibold">{session.destination}</span>
+        </div>
+        <p aria-live="polite" className="mt-8 text-7xl font-bold tracking-tight sm:text-8xl">
           {String(Math.floor(seconds / 60)).padStart(2, '0')}:{String(seconds % 60).padStart(2, '0')}
         </p>
-        <p className="mt-3 text-primary-100">
-          Block {session.activeIndex + 1} of {session.blocks.length} · {session.destination}
-        </p>
-        <div className="mt-7 flex gap-3">
+        <div className="mt-8 flex flex-wrap gap-3">
           <button
-            className="rounded-xl bg-white px-4 py-3 font-bold text-brand-deep"
+            aria-label={session.pausedAt ? 'Resume timer' : 'Pause timer'}
+            className="inline-flex min-h-12 cursor-pointer items-center gap-2 rounded-xl bg-surface px-4 py-3 font-bold text-brand-deep transition-colors hover:bg-primary-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             onClick={() =>
               commit(
                 session.pausedAt
@@ -293,141 +332,79 @@ export function FocusDashboard() {
             type="button"
           >
             {session.pausedAt ? <Play className="size-5" /> : <Pause className="size-5" />}
+            {session.pausedAt ? 'Resume' : 'Pause'}
           </button>
-          <button className="rounded-xl border border-white/30 px-4 py-3 font-bold" onClick={advance} type="button">
-            <SkipForward className="size-5" />
+          <button
+            className="inline-flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border border-white/35 px-4 py-3 font-bold text-white transition-colors hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            onClick={() => {
+              finishingSessionId.current = null;
+              commit(null);
+            }}
+            type="button"
+          >
+            <RotateCcw className="size-5" /> End session
           </button>
         </div>
       </section>
-      <EncounterCard encounter={encounter} onAction={takeCombatTurn} />
-      {rpg}
+
+      <p className="flex items-start gap-3 rounded-2xl border border-border bg-surface p-4 text-sm text-text-secondary">
+        <BookOpen className="mt-0.5 size-5 shrink-0 text-brand" />
+        The timer stays on this device if your connection drops. Completed focus time syncs when you are back online.
+      </p>
     </main>
   );
 }
 
-function RpgSummary({
-  profile,
-  inventory,
-  onAllocate,
-  onEquip,
+function DurationButton({
+  active,
+  disabled = false,
+  label,
+  onClick,
 }: {
-  profile: RpgProfile | null;
-  inventory: RpgItem[];
-  onAllocate: (stat: 'focus' | 'knowledge' | 'resilience') => void;
-  onEquip: (itemId: string) => void;
+  active: boolean;
+  disabled?: boolean;
+  label: string;
+  onClick: () => void;
 }) {
-  if (!profile)
-    return (
-      <p className="rounded-2xl border border-primary-100 bg-primary-50 p-4 text-sm text-text-secondary">
-        Complete a focus session to begin your commute adventurer journey.
-      </p>
-    );
-  return (
-    <section className="rounded-3xl border border-border bg-surface p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-bold uppercase tracking-[.16em] text-brand">Commute adventurer</p>
-          <h2 className="mt-2 text-2xl font-bold text-ink">Level {profile.level}</h2>
-        </div>
-        <span className="rounded-full bg-accent-100 px-3 py-1 text-sm font-bold text-accent-600">
-          {profile.current_streak} day streak
-        </span>
-      </div>
-      <div className="mt-4 h-2 overflow-hidden rounded-full bg-primary-100">
-        <div
-          className="h-full rounded-full bg-brand"
-          style={{ width: `${Math.min(100, (profile.xp / (profile.level * 100)) * 100)}%` }}
-        />
-      </div>
-      <p className="mt-2 text-sm text-muted">
-        {xpToNextLevel(profile)} XP to level {profile.level + 1}
-      </p>
-      <div className="mt-5 grid grid-cols-3 gap-3">
-        {(['focus', 'knowledge', 'resilience'] as const).map((stat) => (
-          <button
-            className="rounded-xl border border-border bg-white p-3 text-left transition-colors hover:bg-primary-50 disabled:cursor-default"
-            disabled={profile.unspent_stat_points === 0}
-            key={stat}
-            onClick={() => onAllocate(stat)}
-            type="button"
-          >
-            <span className="block text-xs font-bold uppercase tracking-wide text-muted">{stat}</span>
-            <span className="mt-1 block text-xl font-bold text-ink">{profile[stat]}</span>
-          </button>
-        ))}
-      </div>
-      {profile.unspent_stat_points > 0 && (
-        <p className="mt-3 text-sm font-semibold text-brand-deep">
-          Choose an attribute to spend {profile.unspent_stat_points} stat point.
-        </p>
-      )}
-      {inventory.length > 0 && (
-        <div className="mt-4 space-y-2">
-          <p className="text-sm text-muted">Travel kit</p>
-          {inventory.slice(0, 3).map((item) =>
-            item.slot ? (
-              <button
-                className="mr-2 cursor-pointer rounded-lg border border-primary-100 px-3 py-2 text-sm font-semibold text-brand-deep hover:bg-primary-50"
-                key={item.id}
-                onClick={() => onEquip(item.id)}
-                type="button"
-              >
-                {item.item_name} +{item.stat_bonus} {item.stat}
-                {item.is_equipped ? ' · equipped' : ''}
-              </button>
-            ) : (
-              <span className="mr-2 text-sm text-muted" key={item.id}>
-                {item.item_name}
-              </span>
-            ),
-          )}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function EncounterCard({
-  encounter,
-  onAction,
-}: {
-  encounter: RpgEncounter | null;
-  onAction: (action: CombatAction) => void;
-}) {
-  if (!encounter) return null;
-  return (
-    <section className="rounded-3xl bg-brand-deep p-6 text-white shadow-sm">
-      <p className="text-sm font-bold uppercase tracking-[.16em] text-primary-100">Travel encounter</p>
-      <h2 className="mt-2 text-2xl font-bold">{encounter.enemy_name}</h2>
-      <p className="mt-3 text-sm text-primary-100">
-        You {encounter.player_health} HP · opponent {encounter.enemy_health} HP · turn {encounter.turns}/3
-      </p>
-      {encounter.status !== 'pending' ? (
-        <p className="mt-5 font-bold">
-          {encounter.status === 'won'
-            ? 'Encounter cleared.'
-            : 'The encounter fades away. Your session rewards are yours to keep.'}
-        </p>
-      ) : (
-        <div className="mt-5 flex flex-wrap gap-3">
-          <ActionButton icon={<Sword className="size-4" />} label="Attack" onClick={() => onAction('attack')} />
-          <ActionButton icon={<Sparkles className="size-4" />} label="Focus" onClick={() => onAction('focus')} />
-          <ActionButton icon={<Shield className="size-4" />} label="Guard" onClick={() => onAction('guard')} />
-        </div>
-      )}
-    </section>
-  );
-}
-
-function ActionButton({ icon, label, onClick }: { icon: ReactNode; label: string; onClick: () => void }) {
   return (
     <button
-      className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-brand-deep transition-colors hover:bg-primary-50"
+      aria-pressed={active}
+      className={`min-h-12 cursor-pointer rounded-xl border px-3 py-2 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-45 ${
+        active
+          ? 'border-brand bg-primary-50 text-brand-deep'
+          : 'border-border bg-surface text-text-secondary hover:border-primary-100 hover:bg-primary-50'
+      }`}
+      disabled={disabled}
       onClick={onClick}
       type="button"
     >
-      {icon}
       {label}
     </button>
+  );
+}
+
+function FocusStats({ summary }: { summary: FocusSummary | null }) {
+  if (!summary)
+    return (
+      <p className="rounded-2xl border border-border bg-surface-muted p-4 text-sm text-text-secondary">
+        Sign in to keep your focus history and streak in sync across your devices.
+      </p>
+    );
+
+  return (
+    <section aria-label="Focus statistics" className="grid gap-3 sm:grid-cols-3">
+      <StatCard label="Today" value={`${summary.todayMinutes} min`} />
+      <StatCard label="Completed" value={`${summary.completedSessions}`} />
+      <StatCard label="Day streak" value={`${summary.currentStreak}`} />
+    </section>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-surface p-4 shadow-sm">
+      <p className="text-sm font-semibold text-muted">{label}</p>
+      <p className="mt-1 text-2xl font-bold text-ink">{value}</p>
+    </div>
   );
 }
