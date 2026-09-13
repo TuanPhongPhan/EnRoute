@@ -1,9 +1,10 @@
 'use client';
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { Bell, BellOff, LoaderCircle } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Bell, BellOff, LoaderCircle, LogIn, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { clientCache } from '@/lib/client-cache';
+import { createClient } from '@/lib/supabase/client';
 
 type Preferences = {
   leave_reminders: boolean;
@@ -19,6 +20,17 @@ const initial: Preferences = {
 };
 const notificationPreferencesCacheKey = 'notification-preferences';
 const notificationPreferencesCacheTtlMs = 5 * 60_000;
+type NotificationStatus =
+  | 'loading'
+  | 'ready'
+  | 'unsupported'
+  | 'denied'
+  | 'saving'
+  | 'sign-in-required'
+  | 'subscription-error'
+  | 'load-error'
+  | 'save-error';
+type PendingChange = { key: keyof Preferences; enabled: boolean } | null;
 const choices: Array<{ key: keyof Preferences; title: string; description: string }> = [
   {
     key: 'leave_reminders',
@@ -42,33 +54,43 @@ export function NotificationSettings() {
   const [preferences, setPreferences] = useState<Preferences>(
     () => clientCache.read<Preferences>(notificationPreferencesCacheKey)?.value ?? initial,
   );
-  const [status, setStatus] = useState<'loading' | 'ready' | 'unsupported' | 'denied' | 'saving' | 'error'>(() =>
+  const [status, setStatus] = useState<NotificationStatus>(() =>
     clientCache.read<Preferences>(notificationPreferencesCacheKey) ? 'ready' : 'loading',
   );
+  const [pendingChange, setPendingChange] = useState<PendingChange>(null);
+
+  const loadPreferences = useCallback(async () => {
+    try {
+      const next = await clientCache.load(
+        notificationPreferencesCacheKey,
+        notificationPreferencesCacheTtlMs,
+        async () => {
+          const response = await fetch('/api/notifications/preferences');
+          await requireSuccessfulResponse(response);
+          return ((await response.json()) as { preferences: Preferences }).preferences;
+        },
+      );
+      setPreferences(next);
+      setStatus(Notification.permission === 'denied' ? 'denied' : 'ready');
+    } catch (error) {
+      if (isUnauthenticatedError(error)) {
+        clientCache.invalidate(notificationPreferencesCacheKey);
+        setStatus('sign-in-required');
+      } else if (clientCache.read<Preferences>(notificationPreferencesCacheKey)) {
+        setStatus(Notification.permission === 'denied' ? 'denied' : 'ready');
+      } else {
+        setStatus('load-error');
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
       setStatus('unsupported');
       return;
     }
-    void clientCache
-      .load(notificationPreferencesCacheKey, notificationPreferencesCacheTtlMs, async () => {
-        const response = await fetch('/api/notifications/preferences');
-        if (!response.ok) throw new Error('notification_preferences_unavailable');
-        return ((await response.json()) as { preferences: Preferences }).preferences;
-      })
-      .then((next) => {
-        setPreferences(next);
-        setStatus(Notification.permission === 'denied' ? 'denied' : 'ready');
-      })
-      .catch(() => {
-        if (clientCache.read<Preferences>(notificationPreferencesCacheKey)) {
-          setStatus(Notification.permission === 'denied' ? 'denied' : 'ready');
-          return;
-        }
-        setStatus('error');
-      });
-  }, []);
+    void loadPreferences();
+  }, [loadPreferences]);
 
   async function change(key: keyof Preferences, enabled: boolean) {
     // Permission is requested only after an explicit opt-in, which prevents an intrusive prompt on first visit.
@@ -85,21 +107,42 @@ export function NotificationSettings() {
     }
     setStatus('saving');
     const next = { ...preferences, [key]: enabled };
+    setPendingChange({ key, enabled });
     try {
       if (enabled) await registerSubscription();
-      await fetch('/api/notifications/preferences', {
+      const response = await fetch('/api/notifications/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(next),
-      }).then((response) => {
-        if (!response.ok) throw new Error();
       });
+      await requireSuccessfulResponse(response);
       setPreferences(next);
       clientCache.set(notificationPreferencesCacheKey, next);
+      setPendingChange(null);
       setStatus('ready');
-    } catch {
-      setStatus('error');
+    } catch (error) {
+      if (isUnauthenticatedError(error)) setStatus('sign-in-required');
+      else if (error instanceof NotificationSubscriptionError) setStatus('subscription-error');
+      else setStatus('save-error');
     }
+  }
+
+  async function signIn() {
+    const client = createClient();
+    const { error } = await client.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${location.origin}/auth/callback` },
+    });
+    if (error) setStatus('save-error');
+  }
+
+  function retryPendingChange() {
+    if (pendingChange) {
+      void change(pendingChange.key, pendingChange.enabled);
+      return;
+    }
+    setStatus('loading');
+    void loadPreferences();
   }
 
   if (status === 'loading')
@@ -149,7 +192,7 @@ export function NotificationSettings() {
                     aria-label={choice.title}
                     checked={preferences[choice.key]}
                     className="peer sr-only"
-                    disabled={status === 'saving' || status === 'denied'}
+                    disabled={status !== 'ready'}
                     onChange={(event) => {
                       void change(choice.key, event.target.checked);
                     }}
@@ -166,15 +209,44 @@ export function NotificationSettings() {
             ))}
           </div>
           {status === 'denied' && (
-            <p className="mt-4 text-sm leading-6 text-warning">
+            <p role="alert" className="mt-4 text-sm leading-6 text-warning">
               Notifications are blocked by this browser. Enable them in your browser or device settings, then reload
               this page.
             </p>
           )}
-          {status === 'error' && (
-            <p className="mt-4 text-sm leading-6 text-warning">
-              We could not save notification settings. Please try again.
-            </p>
+          {status === 'sign-in-required' && (
+            <div role="alert" className="mt-4">
+              <p className="text-sm leading-6 text-warning">Sign in to save notification alerts on this device.</p>
+              <button
+                className="mt-3 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white transition-colors duration-200 hover:bg-brand-deep"
+                onClick={() => {
+                  void signIn();
+                }}
+                type="button"
+              >
+                <LogIn className="size-4" />
+                Sign in with Google
+              </button>
+            </div>
+          )}
+          {(status === 'subscription-error' || status === 'save-error' || status === 'load-error') && (
+            <div role="alert" className="mt-4">
+              <p className="text-sm leading-6 text-warning">
+                {status === 'subscription-error'
+                  ? 'We could not register this device for notifications. Check your device settings, then try again.'
+                  : status === 'load-error'
+                    ? 'We could not load your notification settings. Please try again.'
+                    : 'We could not save this change. Your previous notification settings are still active.'}
+              </p>
+              <button
+                className="mt-3 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-primary-50"
+                onClick={retryPendingChange}
+                type="button"
+              >
+                <RefreshCw className="size-4" />
+                {status === 'load-error' ? 'Reload notification settings' : 'Try again'}
+              </button>
+            </div>
           )}
           {status === 'saving' && (
             <p className="mt-4 inline-flex items-center gap-2 text-sm text-muted">
@@ -190,19 +262,55 @@ export function NotificationSettings() {
 
 async function registerSubscription() {
   // A VAPID public key identifies this app to the browser push service; its matching private key stays in Supabase.
-  const registration = await navigator.serviceWorker.ready;
-  const existing = await registration.pushManager.getSubscription();
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  if (!publicKey) throw new Error('VAPID public key is unavailable.');
-  const subscription =
-    existing ??
-    (await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: decodeKey(publicKey) }));
-  const response = await fetch('/api/notifications/subscription', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(subscription),
-  });
-  if (!response.ok) throw new Error('Subscription could not be saved.');
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    let existing = await registration.pushManager.getSubscription();
+    const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+    if (!publicKey) throw new NotificationSubscriptionError();
+    const applicationServerKey = decodeKey(publicKey);
+    if (existing && !usesApplicationServerKey(existing, applicationServerKey)) {
+      const removed = await existing.unsubscribe();
+      if (!removed) throw new NotificationSubscriptionError();
+      existing = null;
+    }
+    const subscription =
+      existing ?? (await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey }));
+    const response = await fetch('/api/notifications/subscription', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(subscription),
+    });
+    await requireSuccessfulResponse(response);
+  } catch (error) {
+    if (error instanceof NotificationRequestError) throw error;
+    throw new NotificationSubscriptionError();
+  }
+}
+
+class NotificationRequestError extends Error {
+  constructor(readonly status: number) {
+    super(`Notification request failed with status ${status}.`);
+  }
+}
+
+class NotificationSubscriptionError extends Error {}
+
+async function requireSuccessfulResponse(response: Response) {
+  if (!response.ok) throw new NotificationRequestError(response.status);
+}
+
+function isUnauthenticatedError(error: unknown) {
+  return error instanceof NotificationRequestError && error.status === 401;
+}
+
+function usesApplicationServerKey(subscription: PushSubscription, applicationServerKey: Uint8Array) {
+  const existingKey = subscription.options.applicationServerKey;
+  if (!existingKey) return false;
+  const existingBytes = new Uint8Array(existingKey);
+  return (
+    existingBytes.length === applicationServerKey.length &&
+    existingBytes.every((byte, index) => byte === applicationServerKey[index])
+  );
 }
 
 function decodeKey(value: string) {

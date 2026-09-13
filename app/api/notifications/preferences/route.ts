@@ -16,11 +16,12 @@ export async function GET() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('notification_preferences')
     .select('leave_reminders, disruption_alerts, platform_alerts, alternative_alerts')
     .eq('user_id', user.id)
     .maybeSingle();
+  if (error) return NextResponse.json({ error: 'load_failed' }, { status: 500 });
   return NextResponse.json({ preferences: data ?? defaults });
 }
 
