@@ -27,8 +27,7 @@ export function AccountControls() {
   }, []);
 
   const verifyAccount = useCallback(
-    async (showPendingState = false) => {
-      if (showPendingState) setAccount({ status: 'loading' });
+    async () => {
       const version = ++verificationVersion.current;
       const client = createClient();
       const { data, error } = await client.auth.getUser();
@@ -114,15 +113,18 @@ export function AccountControls() {
         </>
       ) : account.status === 'unavailable' ? (
         <>
-          <p className="mt-1 text-sm leading-6 text-muted">We couldn&apos;t confirm your sign-in status. Try again.</p>
+          <p role="alert" className="mt-1 text-sm leading-6 text-muted">
+            We couldn&apos;t confirm your sign-in status. Sign in again to continue.
+          </p>
           <button
-            className="mt-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-brand-deep hover:bg-primary-50"
+            className="mt-5 inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white transition-colors duration-200 hover:bg-brand-deep"
             onClick={() => {
-              void verifyAccount(true);
+              void signIn();
             }}
             type="button"
           >
-            Retry account check
+            <LogIn className="size-4" />
+            Sign in with Google
           </button>
         </>
       ) : (

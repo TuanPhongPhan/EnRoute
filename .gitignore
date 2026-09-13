@@ -23,3 +23,5 @@ AGENTS.md
 supabase/.temp/
 
 .vscode/*
+
+.vercel
