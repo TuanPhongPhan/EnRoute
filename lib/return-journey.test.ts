@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { berlinDayRange, berlinTimeInput, defaultReturnDeparture, setBerlinTime } from '@/lib/return-journey';
+import {
+  berlinDayRange,
+  berlinTimeInput,
+  defaultReturnDeparture,
+  returnJourneyContext,
+  setBerlinTime,
+} from '@/lib/return-journey';
 
 describe('return journey scheduling', () => {
   it('defaults to the latest future class end', () => {
@@ -26,5 +32,12 @@ describe('return journey scheduling', () => {
     const { start, end } = berlinDayRange(new Date('2026-08-12T10:00:00.000Z'));
     expect(start.toISOString()).toBe('2026-08-11T22:00:00.000Z');
     expect(end.toISOString()).toBe('2026-08-12T22:00:00.000Z');
+  });
+
+  it('changes return planning context one hour before the final class ends', () => {
+    const finalClassEnd = '2026-08-12T14:30:00.000Z';
+    expect(returnJourneyContext(finalClassEnd, new Date('2026-08-12T13:29:59.000Z'))).toBe('later');
+    expect(returnJourneyContext(finalClassEnd, new Date('2026-08-12T13:30:00.000Z'))).toBe('imminent');
+    expect(returnJourneyContext(finalClassEnd, new Date('2026-08-12T14:30:00.000Z'))).toBe('active');
   });
 });

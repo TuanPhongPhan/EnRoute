@@ -1,11 +1,13 @@
 import {
   ArrowDown,
   ArrowRight,
+  CircleAlert,
   CalendarDays,
   CheckCircle2,
   Clock3,
   Footprints,
   GraduationCap,
+  Home,
   MapPin,
   TrainFront,
   TramFront,
@@ -16,6 +18,8 @@ import type { CommuteLegView, TodayCommute } from '@/lib/commute-view';
 import { formatDepartureCountdown, formatLastUpdated } from '@/lib/commute-view';
 import { transportModeIconClasses } from '@/lib/transport-mode-presentation';
 import { ReturnHomePlanner } from '@/components/return-home-planner';
+import { returnJourneyContext } from '@/lib/return-journey';
+import type { TransportJourney } from '@/lib/transport-provider';
 
 const legIcons = {
   walk: Footprints,
@@ -42,6 +46,9 @@ export function TodayDashboard({
   now,
   onRefreshJourney,
   returnClassEndsAt,
+  returnJourney,
+  returnJourneyUpdatedAt,
+  onReturnJourneyChange,
   transportState,
 }: {
   calendarState: 'loading' | 'connected' | 'disconnected' | 'no-event' | 'unavailable';
@@ -49,13 +56,19 @@ export function TodayDashboard({
   now: Date;
   onRefreshJourney?: () => void;
   returnClassEndsAt?: string;
+  returnJourney?: TransportJourney | null;
+  returnJourneyUpdatedAt?: string | null;
+  onReturnJourneyChange?: (journey: TransportJourney | null, updatedAt: string | null) => void;
   transportState: TransportState;
 }) {
+  const returnContext = returnClassEndsAt ? returnJourneyContext(returnClassEndsAt, now) : null;
   if (!commute)
     return (
       <div className="space-y-5 md:space-y-7">
         <NoCommuteState calendarState={calendarState} />
-        {returnClassEndsAt && <ReturnHomePlanner lastClassEndsAt={returnClassEndsAt} />}
+        {returnClassEndsAt && returnContext !== 'later' && (
+          <ReturnHomePlanner lastClassEndsAt={returnClassEndsAt} onJourneyChange={onReturnJourneyChange} />
+        )}
       </div>
     );
   const departurePrompt = formatDepartureCountdown(departureCountdown(commute.leaveHomeAtIso, now));
@@ -70,39 +83,27 @@ export function TodayDashboard({
             {commute.greeting}
           </h1>
         </div>
-        <div
-          aria-label={`Journey status: ${commute.status}`}
-          className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-bold ${statusStyles[commute.status]}`}
-        >
-          <CheckCircle2 aria-hidden="true" className="size-4" />
-          {commute.status}
-        </div>
+        {!requiresImmediateAttention(commute.status) && (
+          <div
+            aria-label={`Journey status: ${commute.status}`}
+            className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-bold ${statusStyles[commute.status]}`}
+          >
+            <CheckCircle2 aria-hidden="true" className="size-4" />
+            {commute.status}
+          </div>
+        )}
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[1.35fr_0.65fr]">
-        <div className="overflow-hidden rounded-3xl bg-brand-deep p-6 text-white shadow-sm md:p-8">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-sm font-bold uppercase tracking-[0.16em] text-primary-100">Leave home</p>
-              <p className="mt-3 text-6xl font-bold tracking-[-0.06em] sm:text-7xl">{commute.leaveHomeAt}</p>
-            </div>
-            <Clock3 aria-hidden="true" className="mt-1 size-6 text-primary-100" />
-          </div>
-          <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-white/20 pt-5">
-            <p
-              className={`inline-flex min-h-11 items-center rounded-xl px-3 text-base font-bold ${departurePrompt.isDue ? 'bg-accent-500 text-white' : 'bg-white/10 text-white'}`}
-            >
-              {departurePrompt.label}
-            </p>
-            <a
-              className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-primary-50"
-              href="#journey"
-            >
-              <span>Start commute</span>
-              <ArrowDown aria-hidden="true" className="size-4" />
-            </a>
-          </div>
-        </div>
+        {returnContext === 'active' && returnClassEndsAt ? (
+          <ReturnHomeHero
+            journey={returnJourney}
+            lastClassEndsAt={returnClassEndsAt}
+            updatedAt={returnJourneyUpdatedAt}
+          />
+        ) : (
+          <OutboundHero departurePrompt={departurePrompt} leaveHomeAt={commute.leaveHomeAt} status={commute.status} />
+        )}
 
         <article className="rounded-3xl border border-border bg-surface p-6 shadow-sm md:p-7">
           <div className="flex items-start justify-between gap-4">
@@ -124,7 +125,15 @@ export function TodayDashboard({
         </article>
       </section>
 
-      {returnClassEndsAt && <ReturnHomePlanner lastClassEndsAt={returnClassEndsAt} />}
+      {returnClassEndsAt && returnContext === 'imminent' && (
+        <ReturnHomePlanner lastClassEndsAt={returnClassEndsAt} onJourneyChange={onReturnJourneyChange} />
+      )}
+
+      {returnClassEndsAt && returnContext === 'active' && (
+        <section id="return-home">
+          <ReturnHomePlanner lastClassEndsAt={returnClassEndsAt} onJourneyChange={onReturnJourneyChange} />
+        </section>
+      )}
 
       <section className="grid gap-5 lg:grid-cols-[1fr_19rem] xl:grid-cols-[1fr_22rem]">
         <JourneyTimeline commute={commute} now={now} onRefresh={onRefreshJourney} transportState={transportState} />
@@ -146,6 +155,105 @@ function CalendarNote({ state }: { state: 'loading' | 'connected' | 'disconnecte
     <p aria-live="polite" className="mt-4 text-xs font-semibold text-muted">
       {messages[state]}
     </p>
+  );
+}
+
+function OutboundHero({
+  departurePrompt,
+  leaveHomeAt,
+  status,
+}: {
+  departurePrompt: ReturnType<typeof formatDepartureCountdown>;
+  leaveHomeAt: string;
+  status: TodayCommute['status'];
+}) {
+  const riskMessage = journeyRiskMessage(status);
+  return (
+    <div className="overflow-hidden rounded-3xl bg-brand-deep p-6 text-white shadow-sm md:p-8">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-[0.16em] text-primary-100">Leave home</p>
+          <p className="mt-3 text-6xl font-bold tracking-[-0.06em] sm:text-7xl">{leaveHomeAt}</p>
+        </div>
+        <Clock3 aria-hidden="true" className="mt-1 size-6 text-primary-100" />
+      </div>
+      {riskMessage && (
+        <div className="mt-5 flex items-start gap-3 rounded-2xl bg-danger-soft px-4 py-3 text-danger">
+          <CircleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0" />
+          <div>
+            <p className="text-sm font-bold">{status}</p>
+            <p className="mt-0.5 text-sm leading-5 text-text-secondary">{riskMessage}</p>
+          </div>
+        </div>
+      )}
+      <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-white/20 pt-5">
+        <p
+          className={`inline-flex min-h-11 items-center rounded-xl px-3 text-base font-bold ${departurePrompt.isDue ? 'bg-accent-500 text-white' : 'bg-white/10 text-white'}`}
+        >
+          {departurePrompt.label}
+        </p>
+        <a
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-primary-50"
+          href="#journey"
+        >
+          <span>Start commute</span>
+          <ArrowDown aria-hidden="true" className="size-4" />
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function requiresImmediateAttention(status: TodayCommute['status']) {
+  return status === 'Tight connection' || status === 'Connection at risk' || status === 'Late for class';
+}
+
+function journeyRiskMessage(status: TodayCommute['status']) {
+  if (status === 'Tight connection') return 'A transfer may be close.';
+  if (status === 'Connection at risk') return 'A delay could affect your arrival.';
+  if (status === 'Late for class') return 'This route is expected to arrive after class starts.';
+  return null;
+}
+
+function ReturnHomeHero({
+  journey,
+  lastClassEndsAt,
+  updatedAt,
+}: {
+  journey?: TransportJourney | null;
+  lastClassEndsAt: string;
+  updatedAt?: string | null;
+}) {
+  return (
+    <div className="overflow-hidden rounded-3xl bg-brand-deep p-6 text-white shadow-sm md:p-8">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-bold uppercase tracking-[0.16em] text-primary-100">After HNU</p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">Return home.</h2>
+          {journey ? (
+            <p className="mt-3 text-lg font-semibold text-primary-50">
+              Leave HNU {formatTime(journey.departure)} · arrive home {formatTime(journey.arrival)}
+            </p>
+          ) : (
+            <p className="mt-3 text-lg text-primary-50">Your final class ended at {formatTime(lastClassEndsAt)}.</p>
+          )}
+        </div>
+        <Home aria-hidden="true" className="mt-1 size-6 text-primary-100" />
+      </div>
+      <div className="mt-7 flex flex-wrap items-center justify-between gap-4 border-t border-white/20 pt-5">
+        <p className="inline-flex min-h-11 items-center rounded-xl bg-white/10 px-3 text-base font-bold text-white">
+          {journey ? formatDuration(journey.durationMinutes) : 'Choose a departure time'}
+        </p>
+        <a
+          className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-primary-50"
+          href="#return-home"
+        >
+          <span>{journey ? 'View return plan' : 'Plan return'}</span>
+          <ArrowDown aria-hidden="true" className="size-4" />
+        </a>
+      </div>
+      {updatedAt && <p className="mt-4 text-xs font-semibold text-primary-100">{formatLastUpdated(updatedAt)}</p>}
+    </div>
   );
 }
 
@@ -287,6 +395,16 @@ function ArrivalSummary({ commute }: { commute: TodayCommute }) {
       </div>
     </aside>
   );
+}
+
+function formatTime(value: string) {
+  return new Intl.DateTimeFormat('de-DE', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Berlin' }).format(
+    new Date(value),
+  );
+}
+
+function formatDuration(minutes: number) {
+  return minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
 }
 
 function NoCommuteState({

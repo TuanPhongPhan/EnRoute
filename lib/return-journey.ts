@@ -1,4 +1,17 @@
 export type ReturnClassEvent = { endsAt: string };
+export type ReturnJourneyContext = 'later' | 'imminent' | 'active';
+
+const returnPlanningWindowMs = 60 * 60_000;
+
+/**
+ * Keeps the dashboard focused on the decision that matters right now.
+ * A return route is never selected or refreshed automatically.
+ */
+export function returnJourneyContext(lastClassEndsAt: string, now = new Date()): ReturnJourneyContext {
+  const classEnd = Date.parse(lastClassEndsAt);
+  if (!Number.isFinite(classEnd) || now.getTime() >= classEnd) return 'active';
+  return classEnd - now.getTime() <= returnPlanningWindowMs ? 'imminent' : 'later';
+}
 
 const berlinTimeZone = 'Europe/Berlin';
 

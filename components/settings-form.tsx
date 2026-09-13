@@ -21,6 +21,8 @@ import {
 } from '@/lib/commute-preferences';
 import { AccountControls } from '@/components/account-controls';
 import { NotificationSettings } from '@/components/notification-settings';
+import { clientCache } from '@/lib/client-cache';
+import { invalidateWeekPlanCache } from '@/lib/week-plan';
 
 type Notice = { kind: 'success' | 'error'; message: string } | null;
 type CalendarOption = { id: string; title: string; primary: boolean };
@@ -35,13 +37,19 @@ type CalendarState =
   | 'rate-limited'
   | 'calendar-not-found'
   | 'unavailable';
+const calendarOptionsCacheKey = 'calendar-options';
+const calendarOptionsCacheTtlMs = 5 * 60_000;
 
 export function SettingsForm() {
   const [preferences, setPreferences] = useState<CommutePreferences>(defaultCommutePreferences);
   const [isReady, setIsReady] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
-  const [calendarState, setCalendarState] = useState<CalendarState>('loading');
-  const [calendars, setCalendars] = useState<CalendarOption[]>([]);
+  const [calendarState, setCalendarState] = useState<CalendarState>(() =>
+    clientCache.read<CalendarOption[]>(calendarOptionsCacheKey) ? 'connected' : 'loading',
+  );
+  const [calendars, setCalendars] = useState<CalendarOption[]>(
+    () => clientCache.read<CalendarOption[]>(calendarOptionsCacheKey)?.value ?? [],
+  );
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -54,20 +62,24 @@ export function SettingsForm() {
   useEffect(() => {
     if (!isReady) return;
     let cancelled = false;
-    void fetch('/api/google/calendar/calendars')
-      .then(async (response) => {
-        if (cancelled) return;
-        if (response.ok) {
-          const payload = (await response.json()) as { calendars: CalendarOption[] };
-          setCalendars(payload.calendars);
-          setCalendarState('connected');
-          return;
+    void clientCache
+      .load(calendarOptionsCacheKey, calendarOptionsCacheTtlMs, async () => {
+        const response = await fetch('/api/google/calendar/calendars');
+        if (!response.ok) {
+          const payload = (await response.json()) as { error?: string };
+          throw new CalendarRequestError(payload.error);
         }
-        const payload = (await response.json()) as { error?: string };
-        setCalendarState(calendarStateFromError(payload.error));
+        return ((await response.json()) as { calendars: CalendarOption[] }).calendars;
       })
-      .catch(() => {
-        if (!cancelled) setCalendarState('unavailable');
+      .then((options) => {
+        if (cancelled) return;
+        setCalendars(options);
+        setCalendarState('connected');
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        if (error instanceof CalendarRequestError) setCalendarState(calendarStateFromError(error.code));
+        else if (!clientCache.read<CalendarOption[]>(calendarOptionsCacheKey)) setCalendarState('unavailable');
       });
     return () => {
       cancelled = true;
@@ -92,6 +104,8 @@ export function SettingsForm() {
         homeAddress: preferences.homeAddress.trim(),
         universityAddress: preferences.universityAddress.trim(),
       });
+      invalidateWeekPlanCache();
+      clientCache.invalidateMatching('today:');
       setNotice({ kind: 'success', message: 'Preferences saved on this device.' });
     } catch {
       setNotice({ kind: 'error', message: 'Preferences could not be saved. Check that browser storage is available.' });
@@ -105,6 +119,9 @@ export function SettingsForm() {
 
   async function disconnectCalendar() {
     await fetch('/api/google/calendar/disconnect', { method: 'POST' });
+    clientCache.invalidate(calendarOptionsCacheKey);
+    invalidateWeekPlanCache();
+    clientCache.invalidateMatching('today:');
     setCalendars([]);
     setCalendarState('disconnected');
     updatePreference('calendarId', 'primary');
@@ -255,6 +272,12 @@ export function SettingsForm() {
   );
 }
 
+class CalendarRequestError extends Error {
+  constructor(readonly code: string | undefined) {
+    super('calendar_options_unavailable');
+  }
+}
+
 function CalendarConnection({
   calendarId,
   calendars,
@@ -331,6 +354,15 @@ function CalendarConnection({
   if (state === 'authorization-expired')
     return (
       <CalendarIssue
+        action={
+          <a
+            className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white transition-colors duration-200 hover:bg-brand-deep focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+            href="/api/google/calendar/connect"
+          >
+            <Link2 aria-hidden="true" className="size-4" />
+            Reconnect Google Calendar
+          </a>
+        }
         title="Google authorization needs refreshing."
         detail={<>Reconnect Google Calendar to grant EnRoute a fresh read-only token.</>}
       />
@@ -382,11 +414,20 @@ function CalendarConnection({
   );
 }
 
-function CalendarIssue({ detail, title }: { detail: React.ReactNode; title: string }) {
+function CalendarIssue({
+  action,
+  detail,
+  title,
+}: {
+  action?: React.ReactNode;
+  detail: React.ReactNode;
+  title: string;
+}) {
   return (
     <div className="mt-6 rounded-2xl bg-warning-soft p-4 text-sm leading-6 text-text-secondary">
       <p className="font-bold">{title}</p>
       <p className="mt-1">{detail}</p>
+      {action}
     </div>
   );
 }

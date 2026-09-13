@@ -3,6 +3,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { TodayDashboard } from '@/components/today-dashboard';
+import { clientCache } from '@/lib/client-cache';
 import { createCommuteRecommendation, rankFeasibleJourneys } from '@/lib/commute-engine';
 import { readCommutePreferences } from '@/lib/commute-preferences';
 import { readCurrentJourney, saveCurrentJourneys, selectedJourney } from '@/lib/current-journey';
@@ -17,6 +18,8 @@ type DayEventsResponse = { events: CalendarEvent[] };
 type CalendarState = 'loading' | 'connected' | 'disconnected' | 'no-event' | 'unavailable';
 type TransportState = 'loading' | 'route_ready' | 'location_not_found' | 'no_route' | 'rate_limited' | 'unavailable';
 type JourneyResponse = { journeys: TransportJourney[]; fetchedAt: string };
+type CachedCalendarResult = { event: CalendarEvent | null; state: CalendarState };
+const todayCalendarCacheTtlMs = 60_000;
 
 export function TodayDashboardClient() {
   const [commute, setCommute] = useState<TodayCommute | null>(null);
@@ -24,7 +27,14 @@ export function TodayDashboardClient() {
   const [calendarState, setCalendarState] = useState<CalendarState>('loading');
   const [transportState, setTransportState] = useState<TransportState>('loading');
   const [returnClassEndsAt, setReturnClassEndsAt] = useState<string | undefined>();
+  const [returnJourney, setReturnJourney] = useState<TransportJourney | null>(null);
+  const [returnJourneyUpdatedAt, setReturnJourneyUpdatedAt] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
+
+  const handleReturnJourneyChange = useCallback((journey: TransportJourney | null, updatedAt: string | null) => {
+    setReturnJourney(journey);
+    setReturnJourneyUpdatedAt(updatedAt);
+  }, []);
 
   const refreshJourney = useCallback(async (nextEvent: CalendarEvent) => {
     const preferences = readCommutePreferences();
@@ -102,21 +112,24 @@ export function TodayDashboardClient() {
       void refreshJourney(cached.event);
     }
     const preferences = readCommutePreferences();
-    void fetch(`/api/google/calendar/next-event?calendarId=${encodeURIComponent(preferences.calendarId)}`)
-      .then(async (response) => {
-        if (!response.ok) {
-          setCalendarState(response.status === 401 ? 'disconnected' : 'unavailable');
-          return;
-        }
+    void clientCache
+      .load<CachedCalendarResult>(`today:next-event:${preferences.calendarId}`, todayCalendarCacheTtlMs, async () => {
+        const response = await fetch(
+          `/api/google/calendar/next-event?calendarId=${encodeURIComponent(preferences.calendarId)}`,
+        );
+        if (!response.ok) return { event: null, state: response.status === 401 ? 'disconnected' : 'unavailable' };
         const payload = (await response.json()) as CalendarResponse;
-        if (!payload.event) {
-          setCalendarState('no-event');
+        return { event: payload.event, state: payload.event ? 'connected' : 'no-event' };
+      })
+      .then((result) => {
+        if (!result.event) {
+          setCalendarState(result.state);
           return;
         }
-        saveEventSnapshot(payload.event);
-        setEvent(payload.event);
-        setCalendarState('connected');
-        void refreshJourney(payload.event);
+        saveEventSnapshot(result.event);
+        setEvent(result.event);
+        setCalendarState(result.state);
+        void refreshJourney(result.event);
       })
       .catch(() => setCalendarState('unavailable'));
   }, [refreshJourney]);
@@ -124,16 +137,20 @@ export function TodayDashboardClient() {
   useEffect(() => {
     const preferences = readCommutePreferences();
     const { start, end } = berlinDayRange();
-    void fetch(
-      `/api/google/calendar/week-events?${new URLSearchParams({
-        calendarId: preferences.calendarId,
-        start: start.toISOString(),
-        end: end.toISOString(),
-      })}`,
-    )
-      .then(async (response) => {
-        if (!response.ok) return;
-        const events = ((await response.json()) as DayEventsResponse).events;
+    const key = `today:last-class:${preferences.calendarId}:${start.toISOString()}`;
+    void clientCache
+      .load(key, todayCalendarCacheTtlMs, async () => {
+        const response = await fetch(
+          `/api/google/calendar/week-events?${new URLSearchParams({
+            calendarId: preferences.calendarId,
+            start: start.toISOString(),
+            end: end.toISOString(),
+          })}`,
+        );
+        if (!response.ok) throw new Error('day_events_unavailable');
+        return ((await response.json()) as DayEventsResponse).events;
+      })
+      .then((events) => {
         const lastClass = events.reduce<CalendarEvent | null>(
           (latest, next) => (!latest || Date.parse(next.endsAt) > Date.parse(latest.endsAt) ? next : latest),
           null,
@@ -166,6 +183,9 @@ export function TodayDashboardClient() {
       calendarState={calendarState}
       commute={commute}
       now={now}
+      returnJourney={returnJourney}
+      returnJourneyUpdatedAt={returnJourneyUpdatedAt}
+      onReturnJourneyChange={handleReturnJourneyChange}
       returnClassEndsAt={returnClassEndsAt}
       onRefreshJourney={
         event

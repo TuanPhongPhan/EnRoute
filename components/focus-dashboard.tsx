@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowRight, BookOpen, CheckCircle2, Coffee, Pause, Play, RotateCcw, TimerReset, WifiOff } from 'lucide-react';
 
 import { readCurrentJourney, selectedJourney } from '@/lib/current-journey';
+import { clientCache } from '@/lib/client-cache';
 import {
   breakMinutes,
   clearFocus,
@@ -25,6 +26,8 @@ import { type FocusSummary } from '@/lib/focus-statistics';
 
 type Completion = PendingFocusCompletion & { phase: 'focus' | 'break' };
 type SyncStatus = 'idle' | 'syncing' | 'saved-locally' | 'saved';
+const focusSummaryCacheKey = 'focus-summary';
+const focusSummaryCacheTtlMs = 5 * 60_000;
 
 export function FocusDashboard() {
   const [session, setSession] = useState<FocusSession | null>(null);
@@ -32,7 +35,9 @@ export function FocusDashboard() {
   const [duration, setDuration] = useState<number>(25);
   const [now, setNow] = useState(0);
   const [online, setOnline] = useState(true);
-  const [summary, setSummary] = useState<FocusSummary | null>(null);
+  const [summary, setSummary] = useState<FocusSummary | null>(
+    () => clientCache.read<FocusSummary>(focusSummaryCacheKey)?.value ?? null,
+  );
   const [completion, setCompletion] = useState<Completion | null>(null);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle');
   const finishingSessionId = useRef<string | null>(null);
@@ -42,10 +47,16 @@ export function FocusDashboard() {
   const fitMinutes = journeyFitMinutes(journey);
 
   const loadSummary = useCallback(async () => {
-    const response = await fetch('/api/focus-sessions');
-    if (!response.ok) return;
-    const data = (await response.json()) as { summary: FocusSummary };
-    setSummary(data.summary);
+    try {
+      const summary = await clientCache.load(focusSummaryCacheKey, focusSummaryCacheTtlMs, async () => {
+        const response = await fetch('/api/focus-sessions');
+        if (!response.ok) throw new Error('focus_summary_unavailable');
+        return ((await response.json()) as { summary: FocusSummary }).summary;
+      });
+      setSummary(summary);
+    } catch {
+      // Keep any in-memory value visible when a background refresh is unavailable.
+    }
   }, []);
 
   const syncCompletion = useCallback(async (item: PendingFocusCompletion) => {
@@ -60,6 +71,7 @@ export function FocusDashboard() {
 
       const data = (await response.json()) as { summary: FocusSummary };
       removePendingFocusCompletion(item.clientSessionId);
+      clientCache.set(focusSummaryCacheKey, data.summary);
       setSummary(data.summary);
       setSyncStatus('saved');
     } catch {

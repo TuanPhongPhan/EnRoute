@@ -1,5 +1,7 @@
 import { ImageResponse } from 'next/og';
 
+import { EnRouteMark } from '@/components/enroute-logo';
+
 export const size = { width: 180, height: 180 };
 export const contentType = 'image/png';
 
@@ -9,17 +11,14 @@ export default function Icon() {
       <div
         style={{
           alignItems: 'center',
-          background: '#0d9488',
-          color: 'white',
+          background: '#14B8A6',
           display: 'flex',
-          fontSize: 96,
-          fontWeight: 700,
           height: '100%',
           justifyContent: 'center',
           width: '100%',
         }}
       >
-        E
+        <EnRouteMark size={180} variant="pwa" />
       </div>
     ),
     { ...size },

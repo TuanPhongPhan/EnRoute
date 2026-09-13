@@ -1,16 +1,23 @@
 'use client';
 
-import { CalendarDays, Compass, Map, Settings, Timer, type LucideIcon } from 'lucide-react';
+import { BarChart3, CalendarDays, Compass, Map, Settings, Timer, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { ViewTransition } from 'react';
+
+import { EnRouteMark, EnRouteWordmark } from '@/components/enroute-logo';
 
 const navigation: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/', label: 'Today', icon: Compass },
   { href: '/week', label: 'Week', icon: CalendarDays },
   { href: '/journey', label: 'Journey', icon: Map },
   { href: '/focus', label: 'Focus', icon: Timer },
+  { href: '/insights', label: 'Insights', icon: BarChart3 },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
+
+// Today is the primary mobile destination, so it sits in the center of the bottom bar.
+const mobileNavigation = [navigation[1], navigation[2], navigation[0], navigation[3], navigation[4], navigation[5]];
 
 export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) {
   const pathname = usePathname();
@@ -36,7 +43,9 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
           </span>
         </header>
         <main id="main-content" className="mx-auto w-full max-w-6xl px-5 pb-10 md:px-9 md:pb-12">
-          {children}
+          <ViewTransition default="none" enter="tab-content-enter" exit="tab-content-exit">
+            {children}
+          </ViewTransition>
         </main>
         <footer className="mx-auto w-full max-w-6xl px-5 pb-8 text-xs leading-5 text-muted md:px-9">
           <p>
@@ -66,7 +75,7 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
         className="fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur md:hidden"
       >
         <div className="mx-auto flex max-w-lg items-stretch justify-around">
-          {navigation.map((item) => (
+          {mobileNavigation.map((item) => (
             <NavItem item={item} key={item.href} active={pathname === item.href} orientation="bottom" />
           ))}
         </div>
@@ -77,14 +86,9 @@ export function AppShell({ children }: Readonly<{ children: React.ReactNode }>) 
 
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
-    <Link aria-label="EnRoute home" className="inline-flex items-center gap-2 text-brand-deep" href="/">
-      <span
-        aria-hidden="true"
-        className="grid size-8 place-items-center rounded-xl bg-brand text-sm font-bold text-white"
-      >
-        E
-      </span>
-      {!compact && <span className="text-lg font-bold tracking-tight">EnRoute</span>}
+    <Link aria-label="EnRoute home" className="inline-flex items-center gap-2" href="/">
+      <EnRouteMark className="size-8" />
+      {!compact && <EnRouteWordmark />}
     </Link>
   );
 }

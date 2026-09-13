@@ -38,11 +38,6 @@ export function JourneyRouteSelector() {
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-ink md:text-4xl">
             {direction === 'return' ? 'Choose your return home.' : 'Choose your connection.'}
           </h1>
-          <p className="mt-3 max-w-xl text-base leading-7 text-muted">
-            {direction === 'return'
-              ? 'Compare regional-transport routes home, then select the connection you want to use.'
-              : 'Compare regional-transport routes. EnRoute balances your arrival around 30 minutes before class, then you can select the connection you want to use.'}
-          </p>
         </div>
         <Link
           className="inline-flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-sm font-bold text-brand-deep transition-colors duration-200 hover:bg-primary-50"

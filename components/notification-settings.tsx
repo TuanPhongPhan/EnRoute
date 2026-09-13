@@ -3,6 +3,7 @@
 
 import { Bell, BellOff, LoaderCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { clientCache } from '@/lib/client-cache';
 
 type Preferences = {
   leave_reminders: boolean;
@@ -16,6 +17,8 @@ const initial: Preferences = {
   platform_alerts: false,
   alternative_alerts: false,
 };
+const notificationPreferencesCacheKey = 'notification-preferences';
+const notificationPreferencesCacheTtlMs = 5 * 60_000;
 const choices: Array<{ key: keyof Preferences; title: string; description: string }> = [
   {
     key: 'leave_reminders',
@@ -36,24 +39,35 @@ const choices: Array<{ key: keyof Preferences; title: string; description: strin
 ];
 
 export function NotificationSettings() {
-  const [preferences, setPreferences] = useState<Preferences>(initial);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'unsupported' | 'denied' | 'saving' | 'error'>('loading');
+  const [preferences, setPreferences] = useState<Preferences>(
+    () => clientCache.read<Preferences>(notificationPreferencesCacheKey)?.value ?? initial,
+  );
+  const [status, setStatus] = useState<'loading' | 'ready' | 'unsupported' | 'denied' | 'saving' | 'error'>(() =>
+    clientCache.read<Preferences>(notificationPreferencesCacheKey) ? 'ready' : 'loading',
+  );
 
   useEffect(() => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
       setStatus('unsupported');
       return;
     }
-    void fetch('/api/notifications/preferences')
-      .then(async (response) => {
-        if (!response.ok) {
-          setStatus('ready');
-          return;
-        }
-        setPreferences(((await response.json()) as { preferences: Preferences }).preferences);
+    void clientCache
+      .load(notificationPreferencesCacheKey, notificationPreferencesCacheTtlMs, async () => {
+        const response = await fetch('/api/notifications/preferences');
+        if (!response.ok) throw new Error('notification_preferences_unavailable');
+        return ((await response.json()) as { preferences: Preferences }).preferences;
+      })
+      .then((next) => {
+        setPreferences(next);
         setStatus(Notification.permission === 'denied' ? 'denied' : 'ready');
       })
-      .catch(() => setStatus('error'));
+      .catch(() => {
+        if (clientCache.read<Preferences>(notificationPreferencesCacheKey)) {
+          setStatus(Notification.permission === 'denied' ? 'denied' : 'ready');
+          return;
+        }
+        setStatus('error');
+      });
   }, []);
 
   async function change(key: keyof Preferences, enabled: boolean) {
@@ -81,6 +95,7 @@ export function NotificationSettings() {
         if (!response.ok) throw new Error();
       });
       setPreferences(next);
+      clientCache.set(notificationPreferencesCacheKey, next);
       setStatus('ready');
     } catch {
       setStatus('error');
@@ -129,16 +144,24 @@ export function NotificationSettings() {
                   <span className="block font-bold text-ink">{choice.title}</span>
                   <span className="mt-1 block text-sm leading-5 text-muted">{choice.description}</span>
                 </span>
-                <input
-                  aria-label={choice.title}
-                  checked={preferences[choice.key]}
-                  className="size-5 accent-teal-600"
-                  disabled={status === 'saving' || status === 'denied'}
-                  onChange={(event) => {
-                    void change(choice.key, event.target.checked);
-                  }}
-                  type="checkbox"
-                />
+                <span className="relative flex size-11 shrink-0 items-center justify-center">
+                  <input
+                    aria-label={choice.title}
+                    checked={preferences[choice.key]}
+                    className="peer sr-only"
+                    disabled={status === 'saving' || status === 'denied'}
+                    onChange={(event) => {
+                      void change(choice.key, event.target.checked);
+                    }}
+                    type="checkbox"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="flex h-6 w-11 items-center rounded-full border border-border bg-surface-muted p-0.5 transition-colors duration-200 peer-checked:border-brand peer-checked:bg-brand peer-checked:[&>span]:translate-x-5 peer-disabled:cursor-not-allowed peer-disabled:opacity-50 peer-focus-visible:ring-4 peer-focus-visible:ring-brand/20"
+                  >
+                    <span className="size-5 rounded-full bg-white shadow-sm transition-transform duration-200" />
+                  </span>
+                </span>
               </label>
             ))}
           </div>

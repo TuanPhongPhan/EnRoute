@@ -20,7 +20,13 @@ type ReturnState =
   | 'unavailable';
 type JourneyResponse = { journeys: TransportJourney[]; fetchedAt: string };
 
-export function ReturnHomePlanner({ lastClassEndsAt }: { lastClassEndsAt: string }) {
+export function ReturnHomePlanner({
+  lastClassEndsAt,
+  onJourneyChange,
+}: {
+  lastClassEndsAt: string;
+  onJourneyChange?: (journey: TransportJourney | null, updatedAt: string | null) => void;
+}) {
   const [departureAt, setDepartureAt] = useState(() => defaultReturnDeparture([{ endsAt: lastClassEndsAt }]));
   const [time, setTime] = useState(() => berlinTimeInput(defaultReturnDeparture([{ endsAt: lastClassEndsAt }])));
   const [journey, setJourney] = useState<TransportJourney | null>(null);
@@ -37,9 +43,10 @@ export function ReturnHomePlanner({ lastClassEndsAt }: { lastClassEndsAt: string
       setJourney(selected);
       setUpdatedAt(current?.fetchedAt ?? null);
       setState(selected ? 'route_ready' : 'idle');
+      onJourneyChange?.(selected, current?.fetchedAt ?? null);
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [lastClassEndsAt]);
+  }, [lastClassEndsAt, onJourneyChange]);
 
   function changeTime(value: string) {
     const nextDeparture = setBerlinTime(departureAt, value);
@@ -48,6 +55,7 @@ export function ReturnHomePlanner({ lastClassEndsAt }: { lastClassEndsAt: string
     setJourney(null);
     setUpdatedAt(null);
     setState('idle');
+    onJourneyChange?.(null, null);
   }
 
   async function findReturnJourney() {
@@ -86,6 +94,7 @@ export function ReturnHomePlanner({ lastClassEndsAt }: { lastClassEndsAt: string
       setUpdatedAt(payload.fetchedAt);
       setDepartureAt(selectedDeparture);
       setState('route_ready');
+      onJourneyChange?.(selected, payload.fetchedAt);
     } catch {
       setState('unavailable');
     }
