@@ -278,7 +278,6 @@ async function registerSubscription() {
     const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!publicKey) throw new NotificationSubscriptionError();
     const applicationServerKey = decodeKey(publicKey);
-    if (existing && usesApplicationServerKey(existing, applicationServerKey)) return;
     if (existing && !usesApplicationServerKey(existing, applicationServerKey)) {
       const removed = await existing.unsubscribe();
       if (!removed) throw new NotificationSubscriptionError();
@@ -289,13 +288,24 @@ async function registerSubscription() {
     const response = await fetch('/api/notifications/subscription', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(subscription),
+      // Register on every preference sync so stale endpoints from an old VAPID key
+      // are removed on the server even if this browser subscription remains valid.
+      body: JSON.stringify({ ...subscription.toJSON(), deviceId: notificationDeviceId() }),
     });
     await requireSuccessfulResponse(response);
   } catch (error) {
     if (error instanceof NotificationRequestError) throw error;
     throw new NotificationSubscriptionError();
   }
+}
+
+function notificationDeviceId() {
+  const key = 'enroute:notification-device-id';
+  const existing = window.localStorage.getItem(key);
+  if (existing && /^[a-f0-9-]{36}$/i.test(existing)) return existing;
+  const deviceId = crypto.randomUUID();
+  window.localStorage.setItem(key, deviceId);
+  return deviceId;
 }
 
 class NotificationRequestError extends Error {

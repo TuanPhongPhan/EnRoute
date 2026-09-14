@@ -53,6 +53,17 @@ describe('current journey session', () => {
     expect(selectedJourney(refreshed)?.id).toBe('second');
   });
 
+  it('keeps a manual selection when Transitous refreshes the same route with a new ID', () => {
+    const storage = new MemoryStorage();
+    saveCurrentJourneys([firstJourney, secondJourney], storage);
+    selectCurrentJourney('second', storage);
+    const providerRefreshedSecond = { ...secondJourney, id: 'provider-refreshed-second' };
+
+    const refreshed = saveCurrentJourneys([providerRefreshedSecond], storage);
+
+    expect(selectedJourney(refreshed)?.id).toBe('provider-refreshed-second');
+  });
+
   it('preserves the successful Transitous fetch time when selecting a route', () => {
     const storage = new MemoryStorage();
     const fetchedAt = '2030-08-10T05:55:00Z';

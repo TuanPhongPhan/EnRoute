@@ -7,7 +7,13 @@ import { clientCache } from '@/lib/client-cache';
 import { createCommuteRecommendation, rankFeasibleJourneys } from '@/lib/commute-engine';
 import { monitorCommute } from '@/lib/commute-monitor-client';
 import { readCommutePreferences } from '@/lib/commute-preferences';
-import { readCurrentJourney, saveCurrentJourneys, selectedJourney } from '@/lib/current-journey';
+import {
+  journeySelectionEvent,
+  readCurrentJourney,
+  saveCurrentJourneys,
+  selectedJourney,
+  type JourneySelectionDetail,
+} from '@/lib/current-journey';
 import { createTodayCommute, type TodayCommute } from '@/lib/commute-view';
 import { berlinDayRange } from '@/lib/return-journey';
 import type { TransportJourney } from '@/lib/transport-provider';
@@ -36,6 +42,26 @@ export function TodayDashboardClient() {
     setReturnJourney(journey);
     setReturnJourneyUpdatedAt(updatedAt);
   }, []);
+
+  const applySelectedOutboundJourney = useCallback(
+    (journey: TransportJourney, selectedEvent: CalendarEvent, fetchedAt: string) => {
+      const preferences = readCommutePreferences();
+      setCommute(
+        createTodayCommute(
+          selectedEvent,
+          createCommuteRecommendation(journey, selectedEvent.startsAt, preferences.arrivalBufferMinutes),
+          new Date(),
+          new Date(fetchedAt),
+        ),
+      );
+      setTransportState('route_ready');
+      void monitorCommute(
+        { calendarEventId: selectedEvent.id, eventStartsAt: selectedEvent.startsAt, direction: 'outbound' },
+        journey,
+      );
+    },
+    [],
+  );
 
   const refreshJourney = useCallback(async (nextEvent: CalendarEvent) => {
     const preferences = readCommutePreferences();
@@ -167,6 +193,23 @@ export function TodayDashboardClient() {
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
   }, [event, refreshJourney]);
+
+  useEffect(() => {
+    const onJourneySelection = (change: Event) => {
+      const detail = (change as CustomEvent<JourneySelectionDetail>).detail;
+      if (!detail) return;
+      if (detail.direction === 'outbound' && event) {
+        applySelectedOutboundJourney(detail.journey, event, detail.fetchedAt);
+        return;
+      }
+      if (detail.direction === 'return') {
+        setReturnJourney(detail.journey);
+        setReturnJourneyUpdatedAt(detail.fetchedAt);
+      }
+    };
+    window.addEventListener(journeySelectionEvent, onJourneySelection);
+    return () => window.removeEventListener(journeySelectionEvent, onJourneySelection);
+  }, [applySelectedOutboundJourney, event]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);

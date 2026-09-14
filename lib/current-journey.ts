@@ -2,9 +2,11 @@ import type { TransportJourney, TransportJourneyLeg } from '@/lib/transport-prov
 
 // Directional storage keeps a chosen trip home from replacing the morning commute.
 const storageKey = 'enroute:current-journey:v5';
+export const journeySelectionEvent = 'enroute:journey-selection-changed';
 
 export type TravelDirection = 'outbound' | 'return';
 export type CurrentJourney = { journeys: TransportJourney[]; selectedJourneyId: string; fetchedAt: string };
+export type JourneySelectionDetail = { direction: TravelDirection; journey: TransportJourney; fetchedAt: string };
 type CurrentJourneys = Partial<Record<TravelDirection, CurrentJourney>>;
 
 export function travelDirection(value: string | null | undefined): TravelDirection {
@@ -42,12 +44,14 @@ export function saveCurrentJourneys(
   fetchedAt = new Date().toISOString(),
   direction: TravelDirection = 'outbound',
 ): CurrentJourney | null {
-  const selectedJourneyId = journeys.some((journey) => journey.id === preferredJourneyId)
-    ? preferredJourneyId
-    : journeys[0]?.id;
+  const saved = readStoredJourneys(storage);
+  const previousChoice = selectedJourney(saved[direction] ?? null);
+  const selectedJourneyId =
+    (journeys.some((journey) => journey.id === preferredJourneyId) && preferredJourneyId) ||
+    journeys.find((journey) => previousChoice && journeySignature(journey) === journeySignature(previousChoice))?.id ||
+    journeys[0]?.id;
   if (!storage || !selectedJourneyId) return null;
   const current = { journeys, selectedJourneyId, fetchedAt };
-  const saved = readStoredJourneys(storage);
   storage.setItem(storageKey, JSON.stringify({ ...saved, [direction]: current }));
   return current;
 }
@@ -62,11 +66,32 @@ export function selectCurrentJourney(
   const next = { ...current, selectedJourneyId: id };
   const saved = readStoredJourneys(storage);
   storage?.setItem(storageKey, JSON.stringify({ ...saved, [direction]: next }));
+  const journey = selectedJourney(next);
+  if (journey && typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent<JourneySelectionDetail>(journeySelectionEvent, { detail: { direction, journey, fetchedAt: next.fetchedAt } }),
+    );
+  }
   return next;
 }
 
 export function selectedJourney(current: CurrentJourney | null) {
   return current?.journeys.find((journey) => journey.id === current.selectedJourneyId) ?? null;
+}
+
+// Provider itinerary IDs can change after a refresh. Scheduled leg identity keeps a
+// deliberate user choice when the same connection is returned with a new provider ID.
+export function journeySignature(journey: TransportJourney) {
+  return JSON.stringify(
+    journey.legs.map((leg) => [
+      leg.mode,
+      leg.label,
+      leg.origin,
+      leg.destination,
+      leg.scheduledDeparture,
+      leg.scheduledArrival,
+    ]),
+  );
 }
 
 function browserStorage(): Storage | null {

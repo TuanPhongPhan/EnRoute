@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createTransferAlerts, transferAlertLeadMinutes } from '@/lib/commute-transfer-alerts';
+import { commuteRouteFingerprint, createTransferAlerts, transferAlertLeadMinutes } from '@/lib/commute-transfer-alerts';
 import type { TransportJourneyLeg } from '@/lib/transport-provider';
 
 const at = (minutes: number) => new Date(Date.UTC(2030, 0, 1, 8, minutes)).toISOString();
@@ -40,5 +40,13 @@ describe('createTransferAlerts', () => {
 
   it('does not notify for the final walk home', () => {
     expect(createTransferAlerts([leg('regional_train', 'RE9', 'Neu-Ulm', 90), leg('walk', 'Walk', 'Home', 100)])).toEqual([]);
+  });
+
+  it('keeps the same route identity when only live times change', () => {
+    const scheduled = leg('regional_train', 'RE9', 'Neu-Ulm', 90);
+    const delayed = { ...scheduled, actualDeparture: at(85), actualArrival: at(95), delayMinutes: 5 };
+    expect(commuteRouteFingerprint({ departure: at(80), arrival: at(90), legs: [scheduled] })).toBe(
+      commuteRouteFingerprint({ departure: at(80), arrival: at(90), legs: [delayed] }),
+    );
   });
 });

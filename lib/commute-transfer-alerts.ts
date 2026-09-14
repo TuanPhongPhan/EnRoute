@@ -34,9 +34,19 @@ export function createTransferAlerts(legs: TransportJourneyLeg[]): CommuteTransf
 }
 
 export function commuteRouteFingerprint(journey: Pick<TransportJourney, 'departure' | 'arrival' | 'legs'>) {
+  // Live delays update actual times frequently. They must not turn the same trip into a
+  // new monitored commute (and a fresh set of transfer notifications) on every refresh.
+  // Scheduled times identify the chosen route; a different booked route still replaces it.
   return JSON.stringify({
     departure: journey.departure,
     arrival: journey.arrival,
-    legs: journey.legs.map((leg) => [leg.mode, leg.label, leg.origin, leg.destination, leg.actualDeparture, leg.actualArrival]),
+    legs: journey.legs.map((leg) => [
+      leg.mode,
+      leg.label,
+      leg.origin,
+      leg.destination,
+      leg.scheduledDeparture,
+      leg.scheduledArrival,
+    ]),
   });
 }
