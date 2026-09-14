@@ -3,7 +3,12 @@ import { commuteRouteFingerprint, createTransferAlerts, transferAlertLeadMinutes
 import type { TransportJourneyLeg } from '@/lib/transport-provider';
 
 const at = (minutes: number) => new Date(Date.UTC(2030, 0, 1, 8, minutes)).toISOString();
-const leg = (mode: TransportJourneyLeg['mode'], label: string, destination: string, arrivalMinute: number): TransportJourneyLeg => ({
+const leg = (
+  mode: TransportJourneyLeg['mode'],
+  label: string,
+  destination: string,
+  arrivalMinute: number,
+): TransportJourneyLeg => ({
   mode,
   label,
   origin: 'Origin',
@@ -17,7 +22,10 @@ const leg = (mode: TransportJourneyLeg['mode'], label: string, destination: stri
 
 describe('createTransferAlerts', () => {
   it('creates an alert five minutes before a vehicle-to-vehicle change', () => {
-    const alerts = createTransferAlerts([leg('subway', 'U2', 'München Hbf', 30), leg('regional_train', 'RE9', 'Neu-Ulm', 90)]);
+    const alerts = createTransferAlerts([
+      leg('subway', 'U2', 'München Hbf', 30),
+      leg('regional_train', 'RE9', 'Neu-Ulm', 90),
+    ]);
     expect(alerts).toEqual([
       expect.objectContaining({
         sequence: 0,
@@ -39,7 +47,9 @@ describe('createTransferAlerts', () => {
   });
 
   it('does not notify for the final walk home', () => {
-    expect(createTransferAlerts([leg('regional_train', 'RE9', 'Neu-Ulm', 90), leg('walk', 'Walk', 'Home', 100)])).toEqual([]);
+    expect(
+      createTransferAlerts([leg('regional_train', 'RE9', 'Neu-Ulm', 90), leg('walk', 'Walk', 'Home', 100)]),
+    ).toEqual([]);
   });
 
   it('keeps the same route identity when only live times change', () => {

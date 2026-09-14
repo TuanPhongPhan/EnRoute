@@ -22,16 +22,25 @@ export async function POST(request: Request) {
   )
     return NextResponse.json({ error: 'invalid_subscription' }, { status: 400 });
   // Store only browser-issued subscription material. RLS binds every record to the authenticated user.
-  const { error } = await supabase
-    .from('push_subscriptions')
-    .upsert(
-      { user_id: user.id, endpoint: body.endpoint, p256dh: body.keys.p256dh, auth: body.keys.auth, device_id: body.deviceId },
-      { onConflict: 'user_id,endpoint' },
-    );
+  const { error } = await supabase.from('push_subscriptions').upsert(
+    {
+      user_id: user.id,
+      endpoint: body.endpoint,
+      p256dh: body.keys.p256dh,
+      auth: body.keys.auth,
+      device_id: body.deviceId,
+    },
+    { onConflict: 'user_id,endpoint' },
+  );
   if (error) return NextResponse.json({ error: 'save_failed' }, { status: 500 });
   // A VAPID rotation creates a new browser endpoint. Keep one endpoint per app install
   // and remove legacy endpoint rows, otherwise one phone receives the same push many times.
-  await supabase.from('push_subscriptions').delete().eq('user_id', user.id).eq('device_id', body.deviceId).neq('endpoint', body.endpoint);
+  await supabase
+    .from('push_subscriptions')
+    .delete()
+    .eq('user_id', user.id)
+    .eq('device_id', body.deviceId)
+    .neq('endpoint', body.endpoint);
   await supabase.from('push_subscriptions').delete().eq('user_id', user.id).is('device_id', null);
   return NextResponse.json({ ok: true });
 }

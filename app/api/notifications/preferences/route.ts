@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-const fields = ['leave_reminders', 'transfer_alerts', 'disruption_alerts', 'platform_alerts', 'alternative_alerts'] as const;
+const fields = [
+  'leave_reminders',
+  'transfer_alerts',
+  'disruption_alerts',
+  'platform_alerts',
+  'alternative_alerts',
+] as const;
 type Preferences = Record<(typeof fields)[number], boolean>;
 const defaults: Preferences = {
   leave_reminders: false,

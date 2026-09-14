@@ -26,21 +26,18 @@ export function AccountControls() {
     setAccount(nextAccount);
   }, []);
 
-  const verifyAccount = useCallback(
-    async () => {
-      const version = ++verificationVersion.current;
-      const client = createClient();
-      const { data, error } = await client.auth.getUser();
-      if (version !== verificationVersion.current) return;
-      if (error) {
-        clientCache.invalidate(accountCacheKey);
-        setAccount({ status: 'unavailable' });
-        return;
-      }
-      setResolvedAccount(accountFromUser(data.user));
-    },
-    [setResolvedAccount],
-  );
+  const verifyAccount = useCallback(async () => {
+    const version = ++verificationVersion.current;
+    const client = createClient();
+    const { data, error } = await client.auth.getUser();
+    if (version !== verificationVersion.current) return;
+    if (error) {
+      clientCache.invalidate(accountCacheKey);
+      setAccount({ status: 'unavailable' });
+      return;
+    }
+    setResolvedAccount(accountFromUser(data.user));
+  }, [setResolvedAccount]);
 
   useEffect(() => {
     const client = createClient();

@@ -12,6 +12,9 @@ yarn-error.log*
 .pnp.js
 *.tsbuildinfo
 .env*.local
+/test-results/
+/playwright-report/
+/blob-report/
 
 # Local editor, agent, and generated design documentation
 .DS_Store

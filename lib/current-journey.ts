@@ -69,7 +69,9 @@ export function selectCurrentJourney(
   const journey = selectedJourney(next);
   if (journey && typeof window !== 'undefined') {
     window.dispatchEvent(
-      new CustomEvent<JourneySelectionDetail>(journeySelectionEvent, { detail: { direction, journey, fetchedAt: next.fetchedAt } }),
+      new CustomEvent<JourneySelectionDetail>(journeySelectionEvent, {
+        detail: { direction, journey, fetchedAt: next.fetchedAt },
+      }),
     );
   }
   return next;
