@@ -11,6 +11,7 @@ import {
   type CurrentJourney,
   type TravelDirection,
 } from '@/lib/current-journey';
+import { monitorCommute, readCommuteMonitorContext } from '@/lib/commute-monitor-client';
 import type { TransportJourney } from '@/lib/transport-provider';
 
 export function JourneyRouteSelector() {
@@ -27,7 +28,11 @@ export function JourneyRouteSelector() {
   if (!current) return <JourneyUnavailable direction={direction} />;
 
   function chooseRoute(id: string) {
-    setCurrent(selectCurrentJourney(id, undefined, direction));
+    const next = selectCurrentJourney(id, undefined, direction);
+    setCurrent(next);
+    const context = readCommuteMonitorContext(direction);
+    const journey = next?.journeys.find((candidate) => candidate.id === id);
+    if (context && journey) void monitorCommute(context, journey);
   }
 
   return (

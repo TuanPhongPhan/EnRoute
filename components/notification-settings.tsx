@@ -8,12 +8,14 @@ import { createClient } from '@/lib/supabase/client';
 
 type Preferences = {
   leave_reminders: boolean;
+  transfer_alerts: boolean;
   disruption_alerts: boolean;
   platform_alerts: boolean;
   alternative_alerts: boolean;
 };
 const initial: Preferences = {
   leave_reminders: false,
+  transfer_alerts: false,
   disruption_alerts: false,
   platform_alerts: false,
   alternative_alerts: false,
@@ -36,6 +38,11 @@ const choices: Array<{ key: keyof Preferences; title: string; description: strin
     key: 'leave_reminders',
     title: 'Leave reminder',
     description: 'A single reminder 20 minutes before you should leave.',
+  },
+  {
+    key: 'transfer_alerts',
+    title: 'Change trains soon',
+    description: 'A reminder five minutes before your next U-Bahn, bus, tram, or train connection.',
   },
   {
     key: 'disruption_alerts',
@@ -70,6 +77,9 @@ export function NotificationSettings() {
           return ((await response.json()) as { preferences: Preferences }).preferences;
         },
       );
+      // A VAPID rotation invalidates the old browser subscription. Renew it quietly for
+      // opted-in users rather than making them turn every notification off and on again.
+      if (Object.values(next).some(Boolean) && Notification.permission === 'granted') await registerSubscription();
       setPreferences(next);
       setStatus(Notification.permission === 'denied' ? 'denied' : 'ready');
     } catch (error) {
@@ -268,6 +278,7 @@ async function registerSubscription() {
     const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
     if (!publicKey) throw new NotificationSubscriptionError();
     const applicationServerKey = decodeKey(publicKey);
+    if (existing && usesApplicationServerKey(existing, applicationServerKey)) return;
     if (existing && !usesApplicationServerKey(existing, applicationServerKey)) {
       const removed = await existing.unsubscribe();
       if (!removed) throw new NotificationSubscriptionError();

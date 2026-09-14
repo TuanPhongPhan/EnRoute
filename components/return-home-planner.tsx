@@ -4,6 +4,7 @@ import { ArrowRight, Clock3, Home, MapPin } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { readCommutePreferences } from '@/lib/commute-preferences';
+import { monitorCommute } from '@/lib/commute-monitor-client';
 import { readCurrentJourney, saveCurrentJourneys, selectedJourney } from '@/lib/current-journey';
 import { formatLastUpdated } from '@/lib/commute-view';
 import { berlinTimeInput, defaultReturnDeparture, setBerlinTime } from '@/lib/return-journey';
@@ -95,6 +96,10 @@ export function ReturnHomePlanner({
       setDepartureAt(selectedDeparture);
       setState('route_ready');
       onJourneyChange?.(selected, payload.fetchedAt);
+      void monitorCommute(
+        { calendarEventId: `return:${lastClassEndsAt}`, eventStartsAt: lastClassEndsAt, direction: 'return' },
+        selected,
+      );
     } catch {
       setState('unavailable');
     }

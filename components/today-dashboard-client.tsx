@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { TodayDashboard } from '@/components/today-dashboard';
 import { clientCache } from '@/lib/client-cache';
 import { createCommuteRecommendation, rankFeasibleJourneys } from '@/lib/commute-engine';
+import { monitorCommute } from '@/lib/commute-monitor-client';
 import { readCommutePreferences } from '@/lib/commute-preferences';
 import { readCurrentJourney, saveCurrentJourneys, selectedJourney } from '@/lib/current-journey';
 import { createTodayCommute, type TodayCommute } from '@/lib/commute-view';
@@ -77,16 +78,10 @@ export function TodayDashboardClient() {
           new Date(payload.fetchedAt),
         ),
       );
-      void fetch('/api/commutes/monitor', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          calendarEventId: nextEvent.id,
-          departureAt: journey.departure,
-          arrivalAt: journey.arrival,
-          eventStartsAt: nextEvent.startsAt,
-        }),
-      });
+      void monitorCommute(
+        { calendarEventId: nextEvent.id, eventStartsAt: nextEvent.startsAt, direction: 'outbound' },
+        journey,
+      );
       setTransportState('route_ready');
     } catch {
       setTransportState('unavailable');

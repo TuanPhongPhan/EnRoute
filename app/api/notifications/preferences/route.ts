@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 
-const fields = ['leave_reminders', 'disruption_alerts', 'platform_alerts', 'alternative_alerts'] as const;
+const fields = ['leave_reminders', 'transfer_alerts', 'disruption_alerts', 'platform_alerts', 'alternative_alerts'] as const;
 type Preferences = Record<(typeof fields)[number], boolean>;
 const defaults: Preferences = {
   leave_reminders: false,
+  transfer_alerts: false,
   disruption_alerts: false,
   platform_alerts: false,
   alternative_alerts: false,
@@ -18,7 +19,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
   const { data, error } = await supabase
     .from('notification_preferences')
-    .select('leave_reminders, disruption_alerts, platform_alerts, alternative_alerts')
+    .select('leave_reminders, transfer_alerts, disruption_alerts, platform_alerts, alternative_alerts')
     .eq('user_id', user.id)
     .maybeSingle();
   if (error) return NextResponse.json({ error: 'load_failed' }, { status: 500 });
