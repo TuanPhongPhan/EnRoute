@@ -18,6 +18,9 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:preproduction
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: e2e-test-key
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4
